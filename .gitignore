@@ -9,6 +9,9 @@
 
 Migrations/
 data.db
+data.db-shm
+data.db-wal
+.vscode/
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/

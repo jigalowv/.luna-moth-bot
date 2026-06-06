@@ -20,7 +20,7 @@ public sealed class UsersModule : InteractionModuleBase<SocketInteractionContext
     [SlashCommand("add", "добавляет пользователя в базу данных.")]
     public async Task AddAsync(SocketUser user, UserRole role = UserRole.none)
     {
-        await DeferAsync();
+        await DeferAsync(ephemeral: true);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
@@ -47,7 +47,7 @@ public sealed class UsersModule : InteractionModuleBase<SocketInteractionContext
     [SlashCommand("set-role", "устанавливает новую роль для пользователя.")]
     public async Task SetRoleAsync(SocketUser user, UserRole newRole)
     {
-        await DeferAsync();
+        await DeferAsync(ephemeral: true);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 

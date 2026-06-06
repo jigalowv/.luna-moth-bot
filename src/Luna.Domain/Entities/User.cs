@@ -7,7 +7,7 @@ public class User
     public int Id { get; init; }
     public ulong DiscordId { get; init; }
     public UserRole Role { get; private set; }
-    public DateTime CreatedAt { get; init; }
+    public DateTime? CreatedAt { get; init; }
 
     private User() {}
 
@@ -15,30 +15,22 @@ public class User
     {
         if (discordId == 0)
         {
-            throw new ArgumentException("Discord ID cannot be zero.", nameof(discordId));
+            throw new ArgumentException(
+                "Discord ID cannot be zero.", nameof(discordId));
         }
 
         return new User
         {
-            Id = 0,
             DiscordId = discordId,
-            Role = role,
-            CreatedAt = DateTime.UtcNow
+            Role = role
         };
     }
 
-    public void SetRole(UserRole newRole)
-    {
-        Role = newRole;
-    }
+    public void SetRole(UserRole newRole) => Role = newRole;
 
-    public bool CanAssignRole(UserRole targetRole)
-    {
-        return this.Role >= UserRole.Moderator && this.Role > targetRole;
-    }
+    public bool CanAssignRole(UserRole targetRole) =>
+        this.Role >= UserRole.Moderator && this.Role > targetRole;
 
-    public bool CanReassignRole(UserRole beforeRole, UserRole afterRole)
-    {
-        return CanAssignRole(afterRole) && Role > beforeRole;
-    }
+    public bool CanReassignRole(UserRole beforeRole, UserRole afterRole) =>
+        CanAssignRole(afterRole) && Role > beforeRole;
 }

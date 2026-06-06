@@ -2,13 +2,17 @@ using System.Reflection;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using Luna.Application.Record.Events.UserJoinChannel;
+using Luna.Application.Record.Events.UserLeftChannel;
+using Luna.Application.Record.Events.UserSetDeafenStatus;
+using MediatR;
 
 namespace Luna.Presentation.Services;
 
-public class InteractionHandler
+public sealed class InteractionHandler
 {
-    private const ulong TrackedVcId = 1317038114392510499;
-    private const ulong TrackedGuildId = 1317038113796657223;
+    private const ulong TrackedGuildId1 = 300276721075355649;
+    private const ulong TrackedGuildId2 = 1317038113796657223;
     
     private readonly ILogger<InteractionHandler> _logger;
     private readonly InteractionService _interactionService;
@@ -39,13 +43,25 @@ public class InteractionHandler
     private async Task OnReadyAsync()
     {
         _logger.LogInformation("Bot is connected and ready.");
-        #if DEBUG
-            await _interactionService.RegisterCommandsToGuildAsync(TrackedGuildId);
-            _logger.LogInformation($"Commands registered locally to guild: {TrackedGuildId}");
-        #else
-            await _interactionService.RegisterCommandsGloballyAsync();
-            _logger.LogInformation("Commands registered globally.");
-        #endif
+        
+        try
+        {
+            #if DEBUG
+                await _interactionService.RegisterCommandsToGuildAsync(TrackedGuildId1);
+                _logger.LogInformation("Commands registered locally to guild: {GuildId}", TrackedGuildId1);
+                
+                await _interactionService.RegisterCommandsToGuildAsync(TrackedGuildId2);
+                _logger.LogInformation("Commands registered locally to guild: {GuildId}", TrackedGuildId2);
+            #else
+                await _interactionService.RegisterCommandsGloballyAsync();
+                _logger.LogInformation("Commands registered globally.");
+            #endif
+        }
+        catch (Exception ex)
+        {
+            _logger.LogCritical(ex, 
+                "Failed to register application commands during OnReady initialization.");
+        }
     }
 
     private Task OnUserVoiceStateUpdatedAsync(
@@ -56,32 +72,67 @@ public class InteractionHandler
         if (user.IsBot)
             return Task.CompletedTask;
 
-        ulong? beforeChannelId = before.VoiceChannel?.Id;
-        ulong? afterChannelId = after.VoiceChannel?.Id;
-
-        if (beforeChannelId == TrackedVcId && afterChannelId == TrackedVcId)
+        _ = Task.Run(async () =>
         {
-            if (before.IsSelfDeafened != after.IsSelfDeafened)
+            try
             {
-                if (after.IsSelfDeafened)
-                    _logger.LogInformation("{Username}: doesn't listen now (deafened).", user.Username);
-                else
-                    _logger.LogInformation("{Username}: listens now (undeafened).", user.Username);
+                using var scope = _services.CreateScope();
+                
+                var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+                
+                ulong? beforeChannelId = before.VoiceChannel?.Id;
+                ulong? afterChannelId = after.VoiceChannel?.Id;
+
+                if (beforeChannelId != afterChannelId)
+                {
+                    if (beforeChannelId is not null)
+                    {
+                        var leftRequest = new UserLeftChannelRequest(
+                            beforeChannelId.Value, 
+                            user.Id);
+
+                        var result = await mediator.Send(leftRequest);
+                        
+                        if (result.IsError)
+                            _logger.LogWarning(
+                                "Left channel error: {Code}", result.Errors.First().Code);
+                    }
+
+                    if (afterChannelId is not null)
+                    {
+                        var joinRequest = new UserJoinChannelRequest(
+                            afterChannelId.Value, 
+                            user.Id, 
+                            after.IsSelfDeafened);
+
+                        var result = await mediator.Send(joinRequest);
+                        
+                        if (result.IsError)
+                            _logger.LogWarning(
+                                "Join channel error: {Code}", result.Errors.First().Code);
+                    }
+                }
+                else if (
+                    afterChannelId is not null && 
+                    before.IsSelfDeafened != after.IsSelfDeafened)
+                {
+                    var setDeafenStatusRequest = new UserSetDeafenStatusRequest(
+                        afterChannelId.Value, 
+                        user.Id, 
+                        after.IsSelfDeafened);
+                    
+                    var result = await mediator.Send(setDeafenStatusRequest);
+                        
+                    if (result.IsError)
+                        _logger.LogWarning(
+                            "Join channel error: {Code}", result.Errors.First().Code);
+                }
             }
-            return Task.CompletedTask;
-        }
-
-        if (beforeChannelId == TrackedVcId && afterChannelId != TrackedVcId)
-        {
-            _logger.LogInformation("{Username}: left the tracked channel.", user.Username);
-            return Task.CompletedTask;
-        }
-
-        if (beforeChannelId != TrackedVcId && afterChannelId == TrackedVcId)
-        {
-            _logger.LogInformation("{Username}: joined the tracked channel.", user.Username);
-            return Task.CompletedTask;
-        }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing voice state update for user {UserId}", user.Id);
+            }
+        });
 
         return Task.CompletedTask;
     }
