@@ -2,7 +2,7 @@ namespace Luna.Domain.Enums;
 
 public enum UserRole
 {
-    none,
+    None,
     Curator,
     Moderator,
     head

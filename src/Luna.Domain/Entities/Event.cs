@@ -7,7 +7,6 @@ public class Event
     public int CreatorId { get; set; }
     public DateTime StartAt { get; set; }
     public DateTime EndAt { get; set; }
-    public DateTime CreatedAt { get; set; }
 
     public EventType Type { get; set; } = null!;
     public User Creator { get; set; } = null!;

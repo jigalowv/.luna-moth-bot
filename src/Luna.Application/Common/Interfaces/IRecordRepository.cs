@@ -1,4 +1,5 @@
 using Luna.Domain.Entities;
+using Luna.Domain.Enums;
 
 namespace Luna.Application.Common.Interfaces;
 
@@ -10,6 +11,15 @@ public interface IRecordRepository
         CancellationToken ct);
 
     Task<bool> CancelAsync(ulong channelId, CancellationToken ct);
+    
+    Task<bool> ToEventAsync(
+        int recordId, 
+        int eventTypeId,
+        int executorId,
+        int minDuration,
+        MemberRole role,
+        CancellationToken ct);
+
     Task<bool> SetNewChannel(
         ICollection<RecordAttendance> recordAttendances, 
         ulong oldChannelId, 

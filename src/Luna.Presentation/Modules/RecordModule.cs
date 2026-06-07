@@ -8,6 +8,8 @@ using Luna.Application.Record.Commands.Start;
 using MediatR;
 using Luna.Application.Record.Commands.List;
 using Luna.Application.Record.Commands.Move;
+using Luna.Application.Record.Commands.End;
+using Luna.Domain.Enums;
 
 namespace Luna.Presentation.Modules;
 
@@ -57,9 +59,9 @@ public sealed class RecordModule
                 ChannelId: channel.Id
             );
 
-            var result = await _mediator.Send(request, cts.Token);
+            var response = await _mediator.Send(request, cts.Token);
             
-            await result.Match(
+            await response.Match(
                 success => FollowupAsync("Запись начата."),
                 errors => FollowupAsync($"Ошибка: {errors.First().Description}")
             );
@@ -296,6 +298,67 @@ public sealed class RecordModule
         {
             await FollowupAsync("The request timed out. Please try again later.");
             _logger.LogError(ex, "Command Error");
+        }
+    }
+
+    public enum AllowedEndRoles
+    {
+        [ChoiceDisplay("Игрок")]
+        Player,
+
+        [ChoiceDisplay("Зритель")]
+        Spectator
+    }
+
+    [SlashCommand("end", "Закончить запись с дальнейшим созданием события в репозитории.")]
+    public async Task EndAsync(
+        SocketChannel channel,
+        [Summary("event-type", "Тип события (выберите из списка)")] 
+        [Autocomplete(typeof(EventTypeAutocomplete))] string eventTypeTitle,
+
+        [Summary("role", "Роль участников")] AllowedEndRoles? role = null,
+        [Summary("min-duration", "Минимальная длительность")] int? minDuration = null)
+    {
+        await DeferAsync(ephemeral: true);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        if (channel is not null &&
+            channel.ChannelType != ChannelType.Voice &&
+            channel.ChannelType != ChannelType.Stage)
+        {
+            await FollowupAsync("Select a VOICE or STAGE channel.");
+            return;
+        }
+
+        try
+        {
+            MemberRole? finalRole = role switch
+            {
+                AllowedEndRoles.Player => MemberRole.Player,
+                AllowedEndRoles.Spectator => MemberRole.Spectator,
+                _ => null
+            };
+
+            var request = new RecordEndRequest(
+                ExecutorDiscordId: Context.User.Id,
+                ChannelId: channel.Id,
+                EventTypeTitle: eventTypeTitle,
+                Role: finalRole,
+                MinDuration: minDuration
+            );
+
+            var response = await _mediator.Send(request, cts.Token);
+
+            await response.Match(
+                success => FollowupAsync("Запись успешно завершена и событие создано."),
+                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+            );
+        }
+        catch (Exception ex)
+        {
+            await FollowupAsync("Время ожидания запроса истекло. Попробуйте позже.");
+            _logger.LogError(ex, "Ошибка при выполнении команды /end");
         }
     }
 }

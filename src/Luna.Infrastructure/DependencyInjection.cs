@@ -20,6 +20,7 @@ public static class DependencyInjection
         });
         
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IEventTypeRepository, EventTypeRepository>();
         services.AddScoped<IRecordAttendanceRepository, RecordAttendanceRepository>();
         services.AddScoped<IRecordRepository, RecordRepository>();
 

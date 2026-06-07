@@ -18,7 +18,7 @@ public sealed class UsersModule : InteractionModuleBase<SocketInteractionContext
     }
 
     [SlashCommand("add", "добавляет пользователя в базу данных.")]
-    public async Task AddAsync(SocketUser user, UserRole role = UserRole.none)
+    public async Task AddAsync(SocketUser user, UserRole role = UserRole.None)
     {
         await DeferAsync(ephemeral: true);
 
@@ -44,7 +44,7 @@ public sealed class UsersModule : InteractionModuleBase<SocketInteractionContext
         }
     }
 
-    [SlashCommand("set-role", "устанавливает новую роль для пользователя.")]
+    [SlashCommand("setrole", "устанавливает новую роль для пользователя.")]
     public async Task SetRoleAsync(SocketUser user, UserRole newRole)
     {
         await DeferAsync(ephemeral: true);

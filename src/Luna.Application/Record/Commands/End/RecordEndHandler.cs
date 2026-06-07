@@ -3,28 +3,28 @@ using Luna.Application.Common.Interfaces;
 using Luna.Domain.Enums;
 using MediatR;
 
-namespace Luna.Application.Record.Commands.Cancel;
+namespace Luna.Application.Record.Commands.End;
 
-public sealed class RecordCancelHandler
-    : IRequestHandler<RecordCancelRequest, ErrorOr<RecordCancelResponse>>
+public class RecordEndHandler 
+    : IRequestHandler<RecordEndRequest, ErrorOr<RecordEndResponse>>
 {
+    private readonly IEventTypeRepository _eventTypeRepository;
     private readonly IUserRepository _userRepository;
     private readonly IRecordRepository _recordRepository;
-    private readonly IRecordAttendanceRepository _recordAttendanceRepository;
 
-    public RecordCancelHandler(
+    public RecordEndHandler(
         IUserRepository userRepository,
         IRecordRepository recordRepository,
-        IRecordAttendanceRepository recordAttendanceRepository
+        IEventTypeRepository eventTypeRepository
     )
     {
+        _eventTypeRepository = eventTypeRepository;
         _userRepository = userRepository;
         _recordRepository = recordRepository;
-        _recordAttendanceRepository = recordAttendanceRepository;
     }
-
-    public async Task<ErrorOr<RecordCancelResponse>> Handle(
-        RecordCancelRequest request, 
+    
+    public async Task<ErrorOr<RecordEndResponse>> Handle(
+        RecordEndRequest request, 
         CancellationToken ct)
     {
         var executor = await _userRepository
@@ -57,23 +57,30 @@ public sealed class RecordCancelHandler
                 $"`{UserRole.Curator}`, то он может использовать " + 
                 "эту команду только на свои записи.");
 
-        var userDeafenDurations = await _recordAttendanceRepository
-            .GetUserDurations(record.Id, true, ct);
-        
-        var userNotDeafenDurations = await _recordAttendanceRepository
-            .GetUserDurations(record.Id, false, ct);
+        var eventType = await _eventTypeRepository
+            .GetByTitleAsync(request.EventTypeTitle, ct); 
 
-        bool success = await _recordRepository
-            .CancelAsync(
-                channelId: record.ChannelId, 
-                ct: ct);
+        if (eventType is null)
+            return Error.NotFound("EventType.NotFound", 
+                "Событие с таким названием не найдено.");
+
+        var now = DateTime.UtcNow; 
+        int minDuration = request.MinDuration ?? 
+            (int)(now - record.StartAt!.Value).TotalMinutes / 4;
+        MemberRole role = request.Role ?? MemberRole.Player;
         
+        var success = await _recordRepository.ToEventAsync(
+            recordId: record.Id,
+            eventTypeId: eventType.Id,
+            executorId: executor.Id,
+            minDuration: minDuration, 
+            role: role,
+            ct: ct);
+
         if (!success)
             return Error.Failure(
                 "Repository.Error", "Ошибка репозитория.");
-
-        return new RecordCancelResponse(
-            UserDeafenDurations: userDeafenDurations,
-            UserNotDeafenDurations: userNotDeafenDurations);
+        
+        return new RecordEndResponse();
     }
 }

@@ -1,5 +1,7 @@
+using System.Security.Cryptography;
 using Luna.Application.Common.Interfaces;
 using Luna.Domain.Entities;
+using Luna.Domain.Enums;
 using Luna.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -150,11 +152,163 @@ public sealed class RecordRepository : IRecordRepository
         catch (Exception ex)
         {
             _logger.LogError(ex, 
-                "Error occurred set new channel");
+                "Error occurred while setting new channel");
             
             return false;
         }
 
         return true;
+    }
+
+    public async Task<bool> ToEventAsync(
+        int recordId, 
+        int eventTypeId, 
+        int executorId, 
+        int minDuration, 
+        MemberRole role, 
+        CancellationToken ct)
+    {
+        var eventTypeExists = await _context.EventTypes
+            .AnyAsync(e => e.Id == eventTypeId, ct);
+        if (!eventTypeExists) return false;
+
+        var executor = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == executorId, ct);
+        if (executor is null) return false;
+
+        var record = await _context.Records
+            .Include(i => i.Attendances)
+            .FirstOrDefaultAsync(i => i.Id == recordId, ct);
+        
+        if (record?.StartAt is null) 
+            return false;
+
+        using var transaction = await _context.Database
+            .BeginTransactionAsync(ct);
+        
+        try
+        {
+            var now = DateTime.UtcNow;
+
+            foreach (var attendance in record.Attendances)
+            {
+                attendance.EndAt ??= now;
+            }
+
+            var uniqueDiscordIds = record.Attendances
+                .Select(i => i.DiscordUserId)
+                .Distinct()
+                .ToList();
+
+            var existingUsers = await _context.Users
+                .Where(u => uniqueDiscordIds.Contains(u.DiscordId))
+                .ToDictionaryAsync(u => u.DiscordId, ct);
+
+            foreach (var discordId in uniqueDiscordIds)
+            {
+                if (!existingUsers.ContainsKey(discordId))
+                {
+                    var newUser = User.Create(discordId, UserRole.None);
+                    _context.Users.Add(newUser);
+                    existingUsers.Add(discordId, newUser);
+                }
+            }
+
+            var newEvent = new Event
+            {
+                StartAt = record.StartAt.Value,
+                EndAt = now,
+                TypeId = eventTypeId,
+                CreatorId = executorId,
+                Members = new List<EventMember>()
+            };
+
+            var attendancesByDiscordId = record.Attendances
+                .GroupBy(i => i.DiscordUserId);
+
+            foreach (var group in attendancesByDiscordId)
+            {
+                if (!existingUsers.TryGetValue(group.Key, out var user)) 
+                    continue;
+
+                int duration = (int)group
+                    .Sum(i => 
+                        (i.EndAt!.Value - i.StartAt!.Value).TotalMinutes);
+
+                var memberRole = duration >= minDuration ? 
+                    role : MemberRole.None;
+                if (user.Id == record.ExecutorId) 
+                    memberRole = MemberRole.Host;
+
+                var eventAttendances = group
+                    .Select(a => new EventAttendance
+                {
+                    StartAt = a.StartAt!.Value,
+                    EndAt = a.EndAt!.Value,
+                    IsDeafened = a.IsDeafened
+                }).ToList();
+
+                newEvent.Members.Add(new EventMember
+                {
+                    User = user,
+                    Role = memberRole,
+                    Attendances = eventAttendances
+                });
+            }
+
+            _context.Events.Add(newEvent);
+
+            await _context.SaveChangesAsync(ct);
+
+            var tempEvent = new Event
+            {
+                TypeId = eventTypeId,
+                StartAt = newEvent.StartAt,
+                EndAt = newEvent.EndAt,
+                CreatorId = newEvent.CreatorId,
+                Members = newEvent.Members.Select(m => new EventMember
+                {
+                    UserId = m.UserId,
+                    Role = m.Role,
+                    Attendances = m.Attendances.Select(a => new EventAttendance
+                    {
+                        StartAt = a.StartAt,
+                        EndAt = a.EndAt,
+                        IsDeafened = a.IsDeafened
+                    }).ToList()
+                }).ToList()
+            };
+
+            _context.Events.Add(tempEvent);
+            await _context.SaveChangesAsync(ct);
+
+            var eventEdit = new EventEdit
+            {
+                EndCode = Convert.ToHexString(
+                    RandomNumberGenerator.GetBytes(6)),
+                EventId = newEvent.Id,
+                TempEventId = tempEvent.Id,
+                Executors = [new EventEditExecutor 
+                {
+                    CreatedAt = now,
+                    ExecutorId = executor.Id
+                }]
+            };
+
+            _context.EventEdits.Add(eventEdit);
+            _context.Records.Remove(record);
+
+            await _context.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, 
+                "Error occurred while ending event for RecordId: {RecordId}", 
+                recordId);
+            return false;
+        }
     }
 }

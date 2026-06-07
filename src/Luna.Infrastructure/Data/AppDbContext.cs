@@ -14,6 +14,12 @@ namespace Luna.Infrastructure.Data
         public DbSet<User> Users { get; set; }
         public DbSet<Record> Records { get; set; }
         public DbSet<RecordAttendance> RecordAttendances { get; set; }
+        public DbSet<EventType> EventTypes { get; set; }
+        public DbSet<Event> Events { get; set; }
+        public DbSet<EventMember> EventMembers { get; set; }
+        public DbSet<EventAttendance> EventAttendances { get; set; }
+        public DbSet<EventEdit> EventEdits { get; set; }
+        public DbSet<EventEditExecutor> EventEditExecutors { get; set; }
 
         protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
         {
@@ -81,8 +87,6 @@ namespace Luna.Infrastructure.Data
 
             modelBuilder.Entity<RecordAttendance>(entity =>
             {
-                entity.ToTable("record_attendances");
-
                 entity.HasKey(e => e.Id);
 
                 entity.Property(e => e.RecordId)
@@ -110,6 +114,119 @@ namespace Luna.Infrastructure.Data
 
                 entity.Property(e => e.EndAt)
                     .IsRequired(false);
+            });
+        
+            modelBuilder.Entity<EventType>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                
+                entity.Property(e => e.Title)
+                    .IsRequired();
+                
+                entity.Property(e => e.CreatedAt)
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                    .ValueGeneratedOnAdd()
+                    .IsRequired();
+            });
+
+            modelBuilder.Entity<Event>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.HasOne(e => e.Creator)
+                    .WithMany()
+                    .HasForeignKey(e => e.CreatorId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired();
+                
+                entity.HasOne(e => e.Type)
+                    .WithMany(e => e.Events)
+                    .HasForeignKey(e => e.TypeId)
+                    .IsRequired();
+                
+                entity.Property(e => e.StartAt)
+                    .IsRequired();
+                
+                entity.Property(e => e.EndAt)
+                    .IsRequired();
+            });
+        
+            modelBuilder.Entity<EventMember>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+            
+                entity.Property(e => e.Role)
+                    .IsRequired();
+
+                entity.HasOne(e => e.Event)
+                    .WithMany(e => e.Members)
+                    .HasForeignKey(e => e.EventId)
+                    .IsRequired();
+                
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .IsRequired();
+                
+                entity.Property(e => e.IsActive)
+                    .IsRequired();
+            });
+        
+            modelBuilder.Entity<EventAttendance>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.IsDeafened)
+                    .IsRequired();
+                
+                entity.Property(e => e.StartAt)
+                    .IsRequired();
+
+                entity.Property(e => e.EndAt)
+                    .IsRequired();
+                
+                entity.HasOne(e => e.Member)
+                    .WithMany(e => e.Attendances)
+                    .HasForeignKey(e => e.MemberId)
+                    .IsRequired();
+            });
+        
+            modelBuilder.Entity<EventEdit>(entity =>
+            {
+                entity.HasKey(e => e.EventId);
+
+                entity.Property(e => e.EndCode)
+                    .IsRequired();
+                
+                entity.HasOne(e => e.TempEvent)
+                    .WithMany()
+                    .HasForeignKey(e => e.TempEventId)
+                    .IsRequired();
+                
+                entity.HasOne(e => e.Event)
+                    .WithMany()
+                    .HasForeignKey(e => e.EventId)
+                    .IsRequired();
+            });
+        
+            modelBuilder.Entity<EventEditExecutor>(entity =>
+            {
+                entity.HasKey(e => new { e.EventEditId, e.ExecutorId });
+
+                entity.HasOne(e => e.EventEdit)
+                    .WithMany(e => e.Executors)
+                    .HasForeignKey(e => e.EventEditId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
+                
+                entity.HasOne(e => e.Executor)
+                    .WithMany()
+                    .HasForeignKey(e => e.ExecutorId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired();
+                
+                entity.Property(e => e.CreatedAt)
+                    .IsRequired();
             });
         }
     }
