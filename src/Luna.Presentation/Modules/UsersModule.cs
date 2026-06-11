@@ -4,6 +4,7 @@ using MediatR;
 using Luna.Application.Users.Commands.AddUser;
 using Luna.Application.Users.Commands.SetUserRole;
 using Luna.Domain.Enums;
+using Luna.Presentation.Enums;
 
 namespace Luna.Presentation.Modules;
 
@@ -18,7 +19,7 @@ public sealed class UsersModule : InteractionModuleBase<SocketInteractionContext
     }
 
     [SlashCommand("add", "добавляет пользователя в базу данных.")]
-    public async Task AddAsync(SocketUser user, UserRole role = UserRole.None)
+    public async Task AddAsync(SocketUser user, SetUserRole role = SetUserRole.None)
     {
         await DeferAsync(ephemeral: true);
 
@@ -29,7 +30,7 @@ public sealed class UsersModule : InteractionModuleBase<SocketInteractionContext
             var request = new AddUserRequest(
                 ExecutorDiscordId: Context.User.Id, 
                 DiscordId: user.Id,
-                Role: role);
+                Role: (UserRole)role);
 
             var result = await _mediator.Send(request, cts.Token);
             
@@ -45,7 +46,7 @@ public sealed class UsersModule : InteractionModuleBase<SocketInteractionContext
     }
 
     [SlashCommand("setrole", "устанавливает новую роль для пользователя.")]
-    public async Task SetRoleAsync(SocketUser user, UserRole newRole)
+    public async Task SetRoleAsync(SocketUser user, SetUserRole newRole)
     {
         await DeferAsync(ephemeral: true);
 
@@ -56,7 +57,7 @@ public sealed class UsersModule : InteractionModuleBase<SocketInteractionContext
             var request = new SetUserRoleRequest(
                 ExecutorDiscordId: Context.User.Id, 
                 DiscordId: user.Id, 
-                NewRole: newRole);
+                NewRole: (UserRole)newRole);
 
             var result = await _mediator.Send(request, cts.Token);
 

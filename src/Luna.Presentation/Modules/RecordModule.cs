@@ -10,6 +10,7 @@ using Luna.Application.Record.Commands.List;
 using Luna.Application.Record.Commands.Move;
 using Luna.Application.Record.Commands.End;
 using Luna.Domain.Enums;
+using Luna.Presentation.Enums;
 
 namespace Luna.Presentation.Modules;
 
@@ -214,17 +215,27 @@ public sealed class RecordModule
             
             var response = await _mediator.Send(request);
 
-            if (response.IsSuccess)
+            if (response.IsError)
             {
-                foreach (var item in response.Value.Items)
-                {
-                    TimeSpan ts = DateTime.UtcNow - item.StartAt;
-                    string duration = $"{(int)ts.TotalHours:00}:{ts.Minutes:00}:{ts.Seconds:00}";
-                    string own = item.ExecutorDiscordId == Context.User.Id ? 
-                        "**(ваша)**" : 
-                        $"<@{item.ExecutorDiscordId}> ({item.ExecutorDiscordId})";
-                    sb.AppendLine($"- (`{duration}`): <#{item.ChannelId}> (`{item.ChannelId}`): {own}");
-                }
+                await FollowupAsync(
+                    $"{response.Errors.First().Description}");
+                return;
+            }
+
+            if (response.Value.Items.Count == 0)
+            {
+                await FollowupAsync($"Возвращено 0 записей.");
+                return;
+            }
+
+            foreach (var item in response.Value.Items)
+            {
+                TimeSpan ts = DateTime.UtcNow - item.StartAt;
+                string duration = $"{(int)ts.TotalHours:00}:{ts.Minutes:00}:{ts.Seconds:00}";
+                string own = item.ExecutorDiscordId == Context.User.Id ? 
+                    "**(ваша)**" : 
+                    $"<@{item.ExecutorDiscordId}> ({item.ExecutorDiscordId})";
+                sb.AppendLine($"- (`{duration}`): <#{item.ChannelId}> (`{item.ChannelId}`): {own}");
             }
 
             var eb = new EmbedBuilder()
@@ -233,10 +244,7 @@ public sealed class RecordModule
                 .WithDescription(sb.ToString())
                 .WithCurrentTimestamp();
 
-            await response.Match(
-                success => FollowupAsync(embed: eb.Build()),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
-            );
+            await FollowupAsync(embed: eb.Build());
         }
         catch (Exception ex)
         {
@@ -301,18 +309,9 @@ public sealed class RecordModule
         }
     }
 
-    public enum AllowedEndRoles
-    {
-        [ChoiceDisplay("Игрок")]
-        Player,
-
-        [ChoiceDisplay("Зритель")]
-        Spectator
-    }
-
     [SlashCommand("end", "Закончить запись с дальнейшим созданием события в репозитории.")]
     public async Task EndAsync(
-        SocketChannel channel,
+        SocketVoiceChannel channel,
         [Summary("event-type", "Тип события (выберите из списка)")] 
         [Autocomplete(typeof(EventTypeAutocomplete))] string eventTypeTitle,
 
@@ -323,7 +322,7 @@ public sealed class RecordModule
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        if (channel is not null &&
+        if (channel is null ||
             channel.ChannelType != ChannelType.Voice &&
             channel.ChannelType != ChannelType.Stage)
         {
@@ -333,18 +332,11 @@ public sealed class RecordModule
 
         try
         {
-            MemberRole? finalRole = role switch
-            {
-                AllowedEndRoles.Player => MemberRole.Player,
-                AllowedEndRoles.Spectator => MemberRole.Spectator,
-                _ => null
-            };
-
             var request = new RecordEndRequest(
                 ExecutorDiscordId: Context.User.Id,
                 ChannelId: channel.Id,
                 EventTypeTitle: eventTypeTitle,
-                Role: finalRole,
+                Role: (MemberRole)(role ?? AllowedEndRoles.Player),
                 MinDuration: minDuration
             );
 

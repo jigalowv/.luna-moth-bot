@@ -67,7 +67,20 @@ public sealed class EventTypeModule
             );
 
             var response = await _mediator.Send(request, cts.Token);
-            
+
+            if (response.IsError)
+            {
+                await FollowupAsync(
+                    $"Ошибка: {response.Errors.First().Description}");
+                return;
+            }
+
+            if (response.Value.Titles.Count == 0)
+            {
+                await FollowupAsync($"Возвращено 0 типов событий.");
+                return;
+            }
+
             var sb = new StringBuilder();
 
             foreach (var title in response.Value.Titles)
@@ -81,10 +94,7 @@ public sealed class EventTypeModule
                 .WithColor(Color.Blue)
                 .WithCurrentTimestamp();
 
-            await response.Match(
-                success => FollowupAsync(embed: eb.Build()),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
-            ); 
+            await FollowupAsync(embed: eb.Build());
         }
         catch (Exception ex)
         {
