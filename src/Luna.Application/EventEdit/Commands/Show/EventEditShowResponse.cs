@@ -4,7 +4,7 @@ using Luna.Domain.Enums;
 namespace Luna.Application.EventEdit.Commands.Show;
 
 public record EventEditShowResponse(
-    Change<string> EventTypeTitle,
+    ClassChange<string> EventTypeTitle,
     ICollection<EventEditShowResponseMember> Members,
 
     ulong EventCreatorDiscordId,
@@ -14,6 +14,6 @@ public record EventEditShowResponse(
 
 public record EventEditShowResponseMember(
     ulong DiscordId,
-    Change<bool> IsActive,
-    Change<MemberRole> Role
+    StructChange<bool> IsActive,
+    StructChange<MemberRole> Role
 );

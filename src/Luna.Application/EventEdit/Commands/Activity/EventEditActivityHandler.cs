@@ -52,7 +52,7 @@ public class EventEditActivityHandler
 
         var target = await _eventEditRepository
             .GetMemberByDiscordIdAsync(
-                eventEdit.TempEventId, request.TargetDiscordId, ct);
+                eventEdit.EventId, request.TargetDiscordId, ct);
         
         if (target is null)
             return Error.NotFound("EventMember.NotFound", 
@@ -60,7 +60,7 @@ public class EventEditActivityHandler
                 $"с Discord ID '{request.TargetDiscordId}' не найден.");
         
         bool success = await _eventEditRepository
-            .SetActivityAsync(target.Id, request.IsActive, ct);
+            .SetActivityAsync(target.MemberId, request.IsActive, ct);
 
         if (!success)
             return Error.Failure(

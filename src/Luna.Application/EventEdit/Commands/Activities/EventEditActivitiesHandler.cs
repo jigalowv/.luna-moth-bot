@@ -3,15 +3,15 @@ using Luna.Application.Common.Interfaces;
 using Luna.Domain.Enums;
 using MediatR;
 
-namespace Luna.Application.EventEdit.Commands.Role;
+namespace Luna.Application.EventEdit.Commands.Activities;
 
-public class EventEditRoleHandler 
-    : IRequestHandler<EventEditRoleRequest, ErrorOr<bool>>
+public class EventEditActivitiesHandler 
+    : IRequestHandler<EventEditActivitiesRequest, ErrorOr<bool>>
 {
     private readonly IUserRepository _userRepository;
     private readonly IEventEditRepository _eventEditRepository;
 
-    public EventEditRoleHandler(
+    public EventEditActivitiesHandler(
         IUserRepository userRepository,
         IEventEditRepository eventEditRepository
     )
@@ -21,7 +21,7 @@ public class EventEditRoleHandler
     }
     
     public async Task<ErrorOr<bool>> Handle(
-        EventEditRoleRequest request, 
+        EventEditActivitiesRequest request, 
         CancellationToken ct)
     {
         var executor = await _userRepository
@@ -50,17 +50,19 @@ public class EventEditRoleHandler
                 "процессов изменения, где вы " + 
                 "являетесь редактором, не найдено.");
 
-        var target = await _eventEditRepository
-            .GetMemberByDiscordIdAsync(
-                eventEdit.EventId, request.TargetDiscordId, ct);
+        var targets = await _userRepository.GetAllByDiscordIdsAsync(
+            request.TargetsDiscordIds, ct);
         
-        if (target is null)
+        if (targets.Count == 0)
             return Error.NotFound("EventMember.NotFound", 
-                $"Участник события (ID: {eventEdit.EventId}) " + 
-                $"с Discord ID '{request.TargetDiscordId}' не найден.");
+                $"Участников события (ID: {eventEdit.EventId}) не найдено.");
         
         bool success = await _eventEditRepository
-            .SetRoleAsync(target.MemberId, request.Role, ct);
+            .SetActivitiesAsync(
+                eventEdit.EventId, 
+                [.. targets.Select(i => i.Id)], 
+                request.IsActive, 
+                ct);
 
         if (!success)
             return Error.Failure(

@@ -6,7 +6,6 @@ public record EventEditListResponse(
 
 public record EventEditListResponseItem(
     int EventId,
-    int TempEventId,
     string EventTypeTitle,
     ulong CreatorDiscordId,
     DateTime StartAt

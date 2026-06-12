@@ -260,40 +260,27 @@ public sealed class RecordRepository : IRecordRepository
 
             await _context.SaveChangesAsync(ct);
 
-            var tempEvent = new Event
-            {
-                TypeId = eventTypeId,
-                StartAt = newEvent.StartAt,
-                EndAt = newEvent.EndAt,
-                CreatorId = newEvent.CreatorId,
-                Members = newEvent.Members.Select(m => new EventMember
-                {
-                    UserId = m.UserId,
-                    Role = m.Role,
-                    Attendances = m.Attendances.Select(a => new EventAttendance
-                    {
-                        StartAt = a.StartAt,
-                        EndAt = a.EndAt,
-                        IsDeafened = a.IsDeafened
-                    }).ToList()
-                }).ToList()
-            };
-
-            _context.Events.Add(tempEvent);
-            await _context.SaveChangesAsync(ct);
-
             var eventEdit = new EventEdit
             {
                 EndCode = Convert.ToHexString(
-                    RandomNumberGenerator.GetBytes(6)),
+                    RandomNumberGenerator.GetBytes(3)),
                 EventId = newEvent.Id,
-                TempEventId = tempEvent.Id,
-                Executors = [new EventEditExecutor 
-                {
-                    CreatedAt = now,
-                    ExecutorId = executor.Id
-                }]
+                MembersEdits = [],
+                Executors = []
             };
+
+            eventEdit.Executors.Add(new EventEditExecutor
+            {
+                ExecutorId = executorId
+            });
+
+            foreach (var member in newEvent.Members)
+            {
+                eventEdit.MembersEdits.Add(new EventMemberEdit
+                {
+                    MemberId = member.Id,
+                });
+            }
 
             _context.EventEdits.Add(eventEdit);
             _context.Records.Remove(record);

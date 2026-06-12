@@ -53,32 +53,31 @@ public class EventEditShowHandler
 
         List<EventEditShowResponseMember> members = [];
 
+        var editsDictionary = eventEdit.MembersEdits
+            .ToDictionary(m => m.MemberId);
+
         foreach (var before in eventEdit.Event.Members)
         {
-            var after = eventEdit.TempEvent.Members
-                .FirstOrDefault(m => 
-                    m.User.DiscordId == before.User.DiscordId);
-            
-            if (after != null)
+            if (editsDictionary.TryGetValue(before.Id, out var after))
             {
                 members.Add(new EventEditShowResponseMember(
                     DiscordId: before.User.DiscordId,
-                    IsActive: new Change<bool>(
+                    IsActive: new StructChange<bool>(
                         Before: before.IsActive,
-                        After: after.IsActive
+                        After: after.NewActivityStatus
                     ),
-                    Role: new Change<MemberRole>(
+                    Role: new StructChange<MemberRole>(
                         Before: before.Role, 
-                        After: after.Role
+                        After: after.NewRole
                     )
                 ));
             }
         }
 
         return new EventEditShowResponse(
-            EventTypeTitle: new Change<string>(
+            EventTypeTitle: new ClassChange<string>(
                 Before: eventEdit.Event.Type.Title, 
-                After: eventEdit.TempEvent.Type.Title),
+                After: eventEdit.NewEventType?.Title),
             Members: members,
             EventCreatorDiscordId: eventEdit.Event.Creator.DiscordId,
             StartAt: eventEdit.Event.StartAt,

@@ -48,11 +48,9 @@ public sealed class EventEditListHandler
         var items = eventEdits
             .Where(ee => 
                 ee.Event is not null && 
-                ee.TempEvent is not null &&
                 ee.Event.Creator is not null && 
                 ee.Event.Type is not null)
             .Select(ee => new EventEditListResponseItem(
-                TempEventId: ee.TempEventId,
                 EventId: ee.EventId,
                 EventTypeTitle: ee.Event.Type!.Title,
                 CreatorDiscordId: ee.Event.Creator!.DiscordId,

@@ -17,6 +17,7 @@ namespace Luna.Infrastructure.Data
         public DbSet<EventType> EventTypes { get; set; }
         public DbSet<Event> Events { get; set; }
         public DbSet<EventMember> EventMembers { get; set; }
+        public DbSet<EventMemberEdit> EventMemberEdits { get; set; }
         public DbSet<EventAttendance> EventAttendances { get; set; }
         public DbSet<EventEdit> EventEdits { get; set; }
         public DbSet<EventEditExecutor> EventEditExecutors { get; set; }
@@ -70,12 +71,6 @@ namespace Luna.Infrastructure.Data
                 entity.HasOne(e => e.Executor)
                     .WithMany()
                     .HasForeignKey(e => e.ExecutorId)
-                    .OnDelete(DeleteBehavior.Restrict)
-                    .IsRequired();
-
-                entity.HasMany(e => e.Attendances)
-                    .WithOne(e => e.Record)
-                    .HasForeignKey(e => e.RecordId)
                     .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired();
 
@@ -94,6 +89,12 @@ namespace Luna.Infrastructure.Data
 
                 entity.Property(e => e.DiscordUserId)
                     .HasConversion(v => (long)v, v => (ulong)v)
+                    .IsRequired();
+
+                entity.HasOne(e => e.Record)
+                    .WithMany(e => e.Attendances)
+                    .HasForeignKey(e => e.RecordId)
+                    .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired();
 
                 entity.HasIndex(e => e.DiscordUserId);
@@ -136,11 +137,12 @@ namespace Luna.Infrastructure.Data
                 entity.HasOne(e => e.Creator)
                     .WithMany()
                     .HasForeignKey(e => e.CreatorId)
-                    .OnDelete(DeleteBehavior.Restrict)
+                    .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired();
                 
                 entity.HasOne(e => e.Type)
                     .WithMany(e => e.Events)
+                    .OnDelete(DeleteBehavior.Cascade)
                     .HasForeignKey(e => e.TypeId)
                     .IsRequired();
                 
@@ -160,11 +162,13 @@ namespace Luna.Infrastructure.Data
 
                 entity.HasOne(e => e.Event)
                     .WithMany(e => e.Members)
+                    .OnDelete(DeleteBehavior.Cascade)
                     .HasForeignKey(e => e.EventId)
                     .IsRequired();
                 
                 entity.HasOne(e => e.User)
                     .WithMany()
+                    .OnDelete(DeleteBehavior.Cascade)
                     .HasForeignKey(e => e.UserId)
                     .IsRequired();
                 
@@ -187,6 +191,7 @@ namespace Luna.Infrastructure.Data
                 
                 entity.HasOne(e => e.Member)
                     .WithMany(e => e.Attendances)
+                    .OnDelete(DeleteBehavior.Cascade)
                     .HasForeignKey(e => e.MemberId)
                     .IsRequired();
             });
@@ -198,15 +203,40 @@ namespace Luna.Infrastructure.Data
                 entity.Property(e => e.EndCode)
                     .IsRequired();
                 
-                entity.HasOne(e => e.TempEvent)
-                    .WithMany()
-                    .HasForeignKey(e => e.TempEventId)
-                    .IsRequired();
+                entity.HasOne(e => e.NewEventType)
+                    .WithOne()
+                    .OnDelete(DeleteBehavior.SetNull)
+                    .HasForeignKey<EventEdit>(e => e.NewTypeId)
+                    .IsRequired(false);
                 
                 entity.HasOne(e => e.Event)
                     .WithMany()
+                    .OnDelete(DeleteBehavior.Cascade)
                     .HasForeignKey(e => e.EventId)
                     .IsRequired();
+            });
+
+            modelBuilder.Entity<EventMemberEdit>(entity =>
+            {
+                entity.HasKey(e => e.MemberId);
+
+                entity.HasOne(e => e.Member)
+                    .WithOne()
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .HasForeignKey<EventMemberEdit>(e => e.MemberId)
+                    .IsRequired(true);
+
+                entity.HasOne(e => e.EventEdit)
+                    .WithMany(e => e.MembersEdits)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .HasForeignKey(e => e.EventEditId)
+                    .IsRequired(true);
+                
+                entity.Property(e => e.NewRole)
+                    .IsRequired(false);
+                
+                entity.Property(e => e.NewActivityStatus)
+                    .IsRequired(false);
             });
         
             modelBuilder.Entity<EventEditExecutor>(entity =>
@@ -222,10 +252,12 @@ namespace Luna.Infrastructure.Data
                 entity.HasOne(e => e.Executor)
                     .WithMany()
                     .HasForeignKey(e => e.ExecutorId)
-                    .OnDelete(DeleteBehavior.Restrict)
+                    .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired();
-                
+
                 entity.Property(e => e.CreatedAt)
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                    .ValueGeneratedOnAdd()
                     .IsRequired();
             });
         }

@@ -19,6 +19,7 @@ public static class DependencyInjection
             options.UseSnakeCaseNamingConvention();
         });
         
+        services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IEventEditRepository, EventEditRepository>();
         services.AddScoped<IEventTypeRepository, EventTypeRepository>();

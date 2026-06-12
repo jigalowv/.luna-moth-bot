@@ -42,6 +42,30 @@ public class UserRepository : IUserRepository
         }
     }
 
+    public async Task<ICollection<User>> GetAllByDiscordIdsAsync(
+        ICollection<ulong> discordIds, 
+        CancellationToken ct)
+    {
+        if (discordIds == null || !discordIds.Any())
+        {
+            return Array.Empty<User>();
+        }
+
+        var distinctIds = discordIds.Distinct().ToList();
+        var result = new List<User>();
+
+        foreach (var chunk in distinctIds.Chunk(1000))
+        {
+            var users = await _context.Users
+                .Where(i => chunk.Contains(i.DiscordId))
+                .ToListAsync(ct);
+                
+            result.AddRange(users);
+        }
+
+        return result;
+    }
+
     public async Task<User?> GetByDiscordIdAsync(
         ulong discordId, 
         CancellationToken ct)

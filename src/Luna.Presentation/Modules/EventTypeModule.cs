@@ -5,7 +5,6 @@ using Luna.Application.EventTypes.Commands.Add;
 using Luna.Application.EventTypes.Commands.List;
 using Luna.Application.EventTypes.Commands.Remove;
 using Luna.Application.EventTypes.Commands.SetTitle;
-using Luna.Application.EventTypes.Queries.EventTypeSearch;
 using MediatR;
 
 namespace Luna.Presentation.Modules;
@@ -14,12 +13,12 @@ namespace Luna.Presentation.Modules;
 public sealed class EventTypeModule 
     : InteractionModuleBase<SocketInteractionContext>
 {
-    private readonly ILogger<PingModule> _logger;
+    private readonly ILogger<EventTypeModule> _logger;
     private readonly IMediator _mediator;
 
     public EventTypeModule(
         IMediator mediator,
-        ILogger<PingModule> logger)
+        ILogger<EventTypeModule> logger)
     {
         _logger = logger;
         _mediator = mediator;

@@ -3,15 +3,15 @@ using Luna.Application.Common.Interfaces;
 using Luna.Domain.Enums;
 using MediatR;
 
-namespace Luna.Application.EventEdit.Commands.Role;
+namespace Luna.Application.EventEdit.Commands.Delete;
 
-public class EventEditRoleHandler 
-    : IRequestHandler<EventEditRoleRequest, ErrorOr<bool>>
+public sealed class EventEditDeleteHandler
+    : IRequestHandler<EventEditDeleteRequest, ErrorOr<string?>>
 {
     private readonly IUserRepository _userRepository;
     private readonly IEventEditRepository _eventEditRepository;
 
-    public EventEditRoleHandler(
+    public EventEditDeleteHandler(
         IUserRepository userRepository,
         IEventEditRepository eventEditRepository
     )
@@ -20,8 +20,8 @@ public class EventEditRoleHandler
         _eventEditRepository = eventEditRepository;
     }
     
-    public async Task<ErrorOr<bool>> Handle(
-        EventEditRoleRequest request, 
+    public async Task<ErrorOr<string?>> Handle(
+        EventEditDeleteRequest request, 
         CancellationToken ct)
     {
         var executor = await _userRepository
@@ -36,7 +36,7 @@ public class EventEditRoleHandler
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
-                "куратор или выше.");
+                "'куратор' или выше.");
 
         Domain.Entities.EventEdit? eventEdit = request.EventId is null ?
             await _eventEditRepository
@@ -49,24 +49,18 @@ public class EventEditRoleHandler
                 "EventEdit.NotFound", 
                 "процессов изменения, где вы " + 
                 "являетесь редактором, не найдено.");
-
-        var target = await _eventEditRepository
-            .GetMemberByDiscordIdAsync(
-                eventEdit.EventId, request.TargetDiscordId, ct);
         
-        if (target is null)
-            return Error.NotFound("EventMember.NotFound", 
-                $"Участник события (ID: {eventEdit.EventId}) " + 
-                $"с Discord ID '{request.TargetDiscordId}' не найден.");
+        if (request.EndCode != eventEdit.EndCode)
+            return eventEdit.EndCode;
         
         bool success = await _eventEditRepository
-            .SetRoleAsync(target.MemberId, request.Role, ct);
+            .DeleteAsync(eventEdit.EventId, ct);
 
         if (!success)
             return Error.Failure(
                 "Repository.Error", 
                 "Ошибка репозитория.");
-
-        return true;
+        
+        return (string?)null;
     }
 }
