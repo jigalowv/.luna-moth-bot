@@ -8,15 +8,15 @@ namespace Luna.Application.EventEdit.Commands.List;
 public sealed class EventEditListHandler 
     : IRequestHandler<EventEditListRequest, ErrorOr<EventEditListResponse>>
 {
-    private readonly IUserRepository _userRepository;
+    private readonly IExecutorRepository _executorRepository;
     private readonly IEventEditRepository _eventEditRepository;
 
     public EventEditListHandler(
-        IUserRepository userRepository,
+        IExecutorRepository executorRepository,
         IEventEditRepository eventEditRepository
     )
     {
-        _userRepository = userRepository;
+        _executorRepository = executorRepository;
         _eventEditRepository = eventEditRepository;
     }
 
@@ -24,7 +24,7 @@ public sealed class EventEditListHandler
         EventEditListRequest request, 
         CancellationToken ct)
     {
-        var executor = await _userRepository
+        var executor = await _executorRepository
             .GetByDiscordIdAsync(request.ExecutorDiscordId, ct);
 
         if (executor is null)
@@ -32,16 +32,16 @@ public sealed class EventEditListHandler
                 "User.ExecutorNotFound", 
                 "Записи о вашем аккаунте не существует в репозитории.");
 
-        if (executor.Role < UserRole.Curator)
+        if (executor.Role < ExecutorRole.Curator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
                     $"куратор или выше.");
 
         ICollection<Domain.Entities.EventEdit> eventEdits = 
-            executor.Role == UserRole.Curator
+            executor.Role == ExecutorRole.Curator
             ? await _eventEditRepository
-                .GetByExecutorIdWithDetailsAsync(executor.Id, ct)
+                .GetByExecutorIdWithDetailsAsync(executor.UserId, ct)
             : await _eventEditRepository
                 .GetAllWithDetailsAsync(ct);
 
@@ -53,7 +53,7 @@ public sealed class EventEditListHandler
             .Select(ee => new EventEditListResponseItem(
                 EventId: ee.EventId,
                 EventTypeTitle: ee.Event.Type!.Title,
-                CreatorDiscordId: ee.Event.Creator!.DiscordId,
+                CreatorDiscordId: ee.Event.Creator!.User.DiscordId,
                 StartAt: ee.Event.StartAt
             ))
             .ToList();

@@ -8,14 +8,14 @@ namespace Luna.Application.EventTypes.Commands.List;
 public sealed class EventTypeListHandler
     : IRequestHandler<EventTypeListRequest, ErrorOr<EventTypeListResponse>>
 {
-    private readonly IUserRepository _userRepository;
+    private readonly IExecutorRepository _executorRepository;
     private readonly IEventTypeRepository _eventTypeRepository;
 
     public EventTypeListHandler(
-        IUserRepository userRepository,
+        IExecutorRepository executorRepository,
         IEventTypeRepository eventTypeRepository)
     {
-        _userRepository = userRepository;
+        _executorRepository = executorRepository;
         _eventTypeRepository = eventTypeRepository;
     }
 
@@ -23,7 +23,7 @@ public sealed class EventTypeListHandler
         EventTypeListRequest request, 
         CancellationToken ct)
     {
-        var executor = await _userRepository
+        var executor = await _executorRepository
             .GetByDiscordIdAsync(request.ExecutorDiscordId, ct);
 
         if (executor is null)
@@ -31,11 +31,11 @@ public sealed class EventTypeListHandler
                 "User.ExecutorNotFound", 
                 "Записи о вашем аккаунте не существует в репозитории.");
 
-        if (executor.Role < UserRole.Curator)
+        if (executor.Role < ExecutorRole.Curator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
-                    $"`{UserRole.Curator}` или выше.");
+                    $"`куратор` или выше.");
         
         var eventTypes = await _eventTypeRepository.GetAllAsync(ct);
 

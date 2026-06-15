@@ -8,15 +8,15 @@ namespace Luna.Application.Record.Commands.List;
 public class RecordListHandler
     : IRequestHandler<RecordListRequest, ErrorOr<RecordListResponse>>
 {
-    private readonly IUserRepository _userRepository;
+    private readonly IExecutorRepository _executorRepository;
     private readonly IRecordRepository _recordRepository;
 
     public RecordListHandler(
-        IUserRepository userRepository,
+        IExecutorRepository executorRepository,
         IRecordRepository recordRepository
     )
     {
-        _userRepository = userRepository;
+        _executorRepository = executorRepository;
         _recordRepository = recordRepository;
     }
     
@@ -24,7 +24,7 @@ public class RecordListHandler
         RecordListRequest request, 
         CancellationToken ct)
     {
-        var executor = await _userRepository
+        var executor = await _executorRepository
             .GetByDiscordIdAsync(request.ExecutorDiscordId, ct);
 
         if (executor is null)
@@ -32,15 +32,15 @@ public class RecordListHandler
                 "User.ExecutorNotFound", 
                 "Записи о вашем аккаунте не существует в репозитории.");
 
-        if (executor.Role < UserRole.Curator)
+        if (executor.Role < ExecutorRole.Curator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
-                    $"`{UserRole.Curator}` или выше.");
+                    $"`{ExecutorRole.Curator}` или выше.");
 
         var channels = await _recordRepository.GetAllAsync(ct);
         
-        if (channels.Count == 0)
+        if (channels.Count == 0 || channels is null)
             return Error.NotFound(
                 "Record.NotFound", 
                 "Текущих записей не найдено.");
@@ -49,7 +49,7 @@ public class RecordListHandler
             .Select(i => new RecordListItem(
                 StartAt: i.StartAt!.Value,
                 ChannelId: i.ChannelId,
-                ExecutorDiscordId: i.Executor.DiscordId))
+                ExecutorDiscordId: i.Executor.User.DiscordId))
             .OrderByDescending(i => i.StartAt)
             .ToArray();
 

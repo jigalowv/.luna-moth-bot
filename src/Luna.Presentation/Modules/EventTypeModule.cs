@@ -5,6 +5,7 @@ using Luna.Application.EventTypes.Commands.Add;
 using Luna.Application.EventTypes.Commands.List;
 using Luna.Application.EventTypes.Commands.Remove;
 using Luna.Application.EventTypes.Commands.SetTitle;
+using Luna.Presentation.Extensions;
 using MediatR;
 
 namespace Luna.Presentation.Modules;
@@ -27,7 +28,7 @@ public sealed class EventTypeModule
     [SlashCommand("remove", "Удалить событие из репозитория.")]
     public async Task RemoveAsync(string title)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         
@@ -42,12 +43,17 @@ public sealed class EventTypeModule
             
             await response.Match(
                 success => FollowupAsync("Событие удалено."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+                errors => FollowupAsync($"Ошибка {errors.First().Description}")
             ); 
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -55,7 +61,7 @@ public sealed class EventTypeModule
     [SlashCommand("list", "Вывести типы событий.")]
     public async Task ListAsync()
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         
@@ -69,14 +75,15 @@ public sealed class EventTypeModule
 
             if (response.IsError)
             {
-                await FollowupAsync(
-                    $"Ошибка: {response.Errors.First().Description}");
+                await FollowupAsync(embed: EmbedHelper
+                    .CreateError(response.Errors.First().Description).Build());
                 return;
             }
 
             if (response.Value.Titles.Count == 0)
             {
-                await FollowupAsync($"Возвращено 0 типов событий.");
+                await FollowupAsync(embed: EmbedHelper
+                    .CreateError("Видов событий не найдено.").Build());
                 return;
             }
 
@@ -87,17 +94,21 @@ public sealed class EventTypeModule
                 sb.AppendLine($"- {title}");
             }
 
-            var eb = new EmbedBuilder()
-                .WithDescription(sb.ToString())
-                .WithTitle("Типы событий")
-                .WithColor(Color.Blue)
-                .WithCurrentTimestamp();
+            var eb = EmbedHelper.CreateBase(
+                title: "Виды событий:",
+                description: sb.ToString()
+            );
 
             await FollowupAsync(embed: eb.Build());
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -105,7 +116,7 @@ public sealed class EventTypeModule
     [SlashCommand("add", "Добавить тип события.")]
     public async Task AddAsync([MaxLength(50)]string title)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
@@ -117,15 +128,26 @@ public sealed class EventTypeModule
             );
 
             var response = await _mediator.Send(request, cts.Token);
+
+            if (response.IsError)
+            {
+                await FollowupAsync(embed: EmbedHelper
+                    .CreateError(response.Errors.First().Description).Build());
+                return;
+            }
             
-            await response.Match(
-                success => FollowupAsync("Событие добавлено."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
-            ); 
+            await FollowupAsync(embed: EmbedHelper.CreateUpdate(
+                $"Добавлено событие: {title}."
+            ).Build()); 
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -135,7 +157,7 @@ public sealed class EventTypeModule
         [Autocomplete(typeof(EventTypeAutocomplete))]string oldTitle,
         string newTitle)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
 
@@ -149,14 +171,25 @@ public sealed class EventTypeModule
 
             var response = await _mediator.Send(request, cts.Token);
 
-            await response.Match(
-                success => FollowupAsync("Событие переименовано."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
-            );
+            if (response.IsError)
+            {
+                await FollowupAsync(embed: EmbedHelper
+                    .CreateError(response.Errors.First().Description).Build());
+                return;
+            }
+            
+            await FollowupAsync(embed: EmbedHelper.CreateUpdate(
+                $"Название события: {oldTitle} → {newTitle}"
+            ).Build()); 
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }

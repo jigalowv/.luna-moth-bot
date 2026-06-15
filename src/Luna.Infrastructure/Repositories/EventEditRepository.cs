@@ -27,10 +27,12 @@ public sealed class EventEditRepository : IEventEditRepository
         return await _context.EventEdits
             .AsNoTracking()
             .AsSplitQuery()
-            .Include(i => i.Executors)
+            .Include(i => i.EventEditExecutors)
                 .ThenInclude(i => i.Executor)
+                    .ThenInclude(i => i.User)
             .Include(i => i.Event)
                 .ThenInclude(i => i.Creator)
+                    .ThenInclude(i => i.User)
             .Include(i => i.Event)
                 .ThenInclude(i => i.Members)
                     .ThenInclude(i => i.User)
@@ -46,10 +48,12 @@ public sealed class EventEditRepository : IEventEditRepository
         return await _context.EventEdits
             .AsNoTracking()
             .AsSplitQuery()
-            .Include(i => i.Executors)
+            .Include(i => i.EventEditExecutors)
                 .ThenInclude(e => e.Executor)
+                    .ThenInclude(i => i.User)
             .Include(i => i.Event)
                 .ThenInclude(c => c.Creator)
+                    .ThenInclude(i => i.User)
             .Include(i => i.Event)
                 .ThenInclude(m => m.Members)
                     .ThenInclude(m => m.User)
@@ -67,11 +71,13 @@ public sealed class EventEditRepository : IEventEditRepository
         return await _context.EventEdits
             .AsNoTracking()
             .AsSplitQuery()
-            .Where(ee => ee.Executors.Any(e => e.ExecutorId == id))
-            .Include(i => i.Executors)
+            .Where(ee => ee.EventEditExecutors.Any(e => e.ExecutorId == id))
+            .Include(i => i.EventEditExecutors)
                 .ThenInclude(e => e.Executor)
+                    .ThenInclude(i => i.User)
             .Include(i => i.Event)
                 .ThenInclude(c => c.Creator)
+                    .ThenInclude(i => i.User)
             .Include(i => i.Event)
                 .ThenInclude(m => m.Members)
                     .ThenInclude(m => m.User)
@@ -79,7 +85,7 @@ public sealed class EventEditRepository : IEventEditRepository
                 .ThenInclude(t => t.Type)
             .Include(i => i.MembersEdits)
             .Include(i => i.NewEventType)
-            .OrderByDescending(ee => ee.Executors
+            .OrderByDescending(ee => ee.EventEditExecutors
                 .Where(e => e.ExecutorId == id)
                 .Max(e => e.CreatedAt))
             .FirstOrDefaultAsync(ct); 
@@ -89,8 +95,8 @@ public sealed class EventEditRepository : IEventEditRepository
     {
         return await _context.EventEdits
             .AsNoTracking()
-            .Where(ee => ee.Executors.Any(e => e.ExecutorId == id))
-            .OrderByDescending(ee => ee.Executors
+            .Where(ee => ee.EventEditExecutors.Any(e => e.ExecutorId == id))
+            .OrderByDescending(ee => ee.EventEditExecutors
                 .Where(e => e.ExecutorId == id)
                 .Max(e => e.CreatedAt))
             .FirstOrDefaultAsync(ct); 
@@ -147,11 +153,13 @@ public sealed class EventEditRepository : IEventEditRepository
         return await _context.EventEdits
             .AsNoTracking()
             .AsSplitQuery()
-            .Where(ee => ee.Executors.Any(e => e.ExecutorId == id))
-            .Include(i => i.Executors)
+            .Where(ee => ee.EventEditExecutors.Any(e => e.ExecutorId == id))
+            .Include(i => i.EventEditExecutors)
                 .ThenInclude(e => e.Executor)
+                    .ThenInclude(i => i.User)
             .Include(i => i.Event)
                 .ThenInclude(c => c.Creator)
+                    .ThenInclude(i => i.User)
             .Include(i => i.Event)
                 .ThenInclude(m => m.Members)
                     .ThenInclude(m => m.User)
@@ -260,11 +268,11 @@ public sealed class EventEditRepository : IEventEditRepository
                 EventId = ev.Id,
                 EndCode = Convert.ToHexString(
                     RandomNumberGenerator.GetBytes(3)),
-                Executors = [],
+                EventEditExecutors = [],
                 MembersEdits = []
             };
 
-            eventEdit.Executors.Add(new EventEditExecutor
+            eventEdit.EventEditExecutors.Add(new EventEditExecutor
             {
                 ExecutorId = executorId
             });

@@ -8,15 +8,15 @@ namespace Luna.Application.EventEdit.Commands.GiveControl;
 public class EventEditGiveControlHandler
     : IRequestHandler<EventEditGiveControlRequest, ErrorOr<bool>>
 {
-    private readonly IUserRepository _userRepository;
+    private readonly IExecutorRepository _executorRepository;
     private readonly IEventEditRepository _eventEditRepository;
 
     public EventEditGiveControlHandler(
-        IUserRepository userRepository,
+        IExecutorRepository executorRepository,
         IEventEditRepository eventEditRepository
     )
     {
-        _userRepository = userRepository;
+        _executorRepository = executorRepository;
         _eventEditRepository = eventEditRepository;
     }
 
@@ -24,7 +24,7 @@ public class EventEditGiveControlHandler
         EventEditGiveControlRequest request, 
         CancellationToken ct)
     {
-        var executor = await _userRepository
+        var executor = await _executorRepository
             .GetByDiscordIdAsync(request.ExecutorDiscordId, ct);
 
         if (executor is null)
@@ -32,7 +32,7 @@ public class EventEditGiveControlHandler
                 "User.ExecutorNotFound", 
                 "Записи о вашем аккаунте не существует в репозитории.");
 
-        if (executor.Role < UserRole.Curator)
+        if (executor.Role < ExecutorRole.Curator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
@@ -40,7 +40,7 @@ public class EventEditGiveControlHandler
 
         Domain.Entities.EventEdit? eventEdit = request.EventId is null ?
             await _eventEditRepository
-                .GetLastByExecutorIdAsync(executor.Id, ct) :
+                .GetLastByExecutorIdAsync(executor.UserId, ct) :
             await _eventEditRepository
                 .GetAsync(request.EventId.Value, ct);
 
@@ -50,29 +50,29 @@ public class EventEditGiveControlHandler
                 "процессов изменения, где вы " + 
                 "являетесь редактором, не найдено.");
         
-        var target = await _userRepository
+        var targetExecutor = await _executorRepository
             .GetByDiscordIdAsync(request.TargetDiscordId, ct);
 
-        if (target is null)
+        if (targetExecutor is null)
             return Error.NotFound(
                 "User.NotFound", 
                 "Записи об аккаунте целевого пользователя не найдено.");
 
-        if (target.Role < UserRole.Curator)
+        if (targetExecutor.Role < ExecutorRole.Curator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У целевого пользователя недостаточно прав. "+ 
                 "Роль исполнителя должна быть 'куратор' или выше.");
         
         var eventExecutor = await _eventEditRepository
-            .GetExecutorAsync(eventEdit.EventId, target.Id, ct);
+            .GetExecutorAsync(eventEdit.EventId, targetExecutor.UserId, ct);
 
         if (eventExecutor is not null)
             return Error.Conflict("EventEditExecutor.AlreadyExists",
                 "Такой исполнитель уже существует.");
         
         bool success = await _eventEditRepository
-            .AddExecutor(eventEdit.EventId, target.Id, ct);
+            .AddExecutor(eventEdit.EventId, targetExecutor.UserId, ct);
     
         if (!success)
             return Error.Failure("Repository.Error", "Ошибка репозитория.");

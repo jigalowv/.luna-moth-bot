@@ -8,17 +8,17 @@ namespace Luna.Application.Record.Commands.Users;
 public sealed class RecordUsersHandler
     : IRequestHandler<RecordUsersRequest, ErrorOr<RecordUsersResponse>>
 {
-    private IUserRepository _userRepository;
+    private IExecutorRepository _executorRepository;
     private IRecordRepository _recordRepository;
     private IRecordAttendanceRepository _recordAttendanceRepository;
 
     public RecordUsersHandler(
-        IUserRepository userRepository,
+        IExecutorRepository executorRepository,
         IRecordRepository recordRepository,
         IRecordAttendanceRepository recordAttendanceRepository
     )
     {
-        _userRepository = userRepository;
+        _executorRepository = executorRepository;
         _recordRepository = recordRepository;
         _recordAttendanceRepository = recordAttendanceRepository;
     }
@@ -27,7 +27,7 @@ public sealed class RecordUsersHandler
         RecordUsersRequest request, 
         CancellationToken ct)
     {
-        var executor = await _userRepository
+        var executor = await _executorRepository
             .GetByDiscordIdAsync(request.ExecutorDiscordId, ct);
 
         if (executor is null)
@@ -35,15 +35,15 @@ public sealed class RecordUsersHandler
                 "User.ExecutorNotFound", 
                 "Записи о вашем аккаунте нет в репозитории.");
 
-        if (executor.Role < UserRole.Curator)
+        if (executor.Role < ExecutorRole.Curator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
-                    $"`{UserRole.Curator}` или выше.");
+                    $"`{ExecutorRole.Curator}` или выше.");
             
         var record = request.ChannelId is null ?
             await _recordRepository
-                .GetByCreatorIdAsync(executor.Id, ct) : 
+                .GetByCreatorIdAsync(executor.UserId, ct) : 
             await _recordRepository
                 .GetAsync(request.ChannelId.Value, ct);
 

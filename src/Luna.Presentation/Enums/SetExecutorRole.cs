@@ -3,14 +3,11 @@ using Luna.Domain.Enums;
 
 namespace Luna.Presentation.Enums;
 
-public enum SetUserRole
+public enum SetExecutorRole
 {
-    [ChoiceDisplay("без роли")]
-    None = UserRole.None,
-
     [ChoiceDisplay("куратор")]
-    Curator = UserRole.Curator,
+    Curator = ExecutorRole.Curator,
     
     [ChoiceDisplay("модератор")]
-    Moderator = UserRole.Moderator,
+    Moderator = ExecutorRole.Moderator,
 }

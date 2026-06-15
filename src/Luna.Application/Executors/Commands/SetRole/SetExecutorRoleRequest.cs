@@ -2,10 +2,10 @@ using ErrorOr;
 using MediatR;
 using Luna.Domain.Enums;
 
-namespace Luna.Application.Users.Commands.AddUser;
+namespace Luna.Application.Executors.Commands.SetRole;
 
-public record AddUserRequest(
+public record ExecutorSetRoleRequest(
     ulong ExecutorDiscordId,
     ulong DiscordId,
-    UserRole Role
+    ExecutorRole NewRole
 ) : IRequest<ErrorOr<bool>>;

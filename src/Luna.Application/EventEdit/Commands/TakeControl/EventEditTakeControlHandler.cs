@@ -8,15 +8,15 @@ namespace Luna.Application.EventEdit.Commands.TakeControl;
 public class EventEditTakeControlHandler
     : IRequestHandler<EventEditTakeControlRequest, ErrorOr<bool>>
 {
-    private readonly IUserRepository _userRepository;
+    private readonly IExecutorRepository _executorRepository;
     private readonly IEventEditRepository _eventEditRepository;
 
     public EventEditTakeControlHandler(
-        IUserRepository userRepository,
+        IExecutorRepository executorRepository,
         IEventEditRepository eventEditRepository
     )
     {
-        _userRepository = userRepository;
+        _executorRepository = executorRepository;
         _eventEditRepository = eventEditRepository;
     }
 
@@ -24,7 +24,7 @@ public class EventEditTakeControlHandler
         EventEditTakeControlRequest request, 
         CancellationToken ct)
     {
-        var executor = await _userRepository
+        var executor = await _executorRepository
             .GetByDiscordIdAsync(request.ExecutorDiscordId, ct);
 
         if (executor is null)
@@ -32,7 +32,7 @@ public class EventEditTakeControlHandler
                 "User.ExecutorNotFound", 
                 "Записи о вашем аккаунте не существует в репозитории.");
 
-        if (executor.Role < UserRole.Moderator)
+        if (executor.Role < ExecutorRole.Moderator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
@@ -46,14 +46,14 @@ public class EventEditTakeControlHandler
                 "Процесс изменения не найден.");
 
         var eventExecutor = await _eventEditRepository
-            .GetExecutorAsync(request.EventId, executor.Id, ct);
+            .GetExecutorAsync(request.EventId, executor.UserId, ct);
 
         if (eventExecutor is not null)
             return Error.Conflict("EventEditExecutor.AlreadyExists",
                 "Такой исполнитель уже существует.");
         
         bool success = await _eventEditRepository
-            .AddExecutor(request.EventId, executor.Id, ct);
+            .AddExecutor(request.EventId, executor.UserId, ct);
     
         if (!success)
             return Error.Failure("Repository.Error", "Ошибка репозитория.");

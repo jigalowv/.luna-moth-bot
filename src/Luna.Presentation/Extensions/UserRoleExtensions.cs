@@ -4,11 +4,11 @@ namespace Luna.Presentation.Extensions;
 
 public static class UserRoleExtensions
 {
-    public static string GetName(this UserRole role) => role switch
+    public static string GetName(this ExecutorRole role) => role switch
     {
-        UserRole.Curator => "куратор",
-        UserRole.Moderator => "модератор",
-        UserRole.head => "глава",
+        ExecutorRole.Curator => "куратор",
+        ExecutorRole.Moderator => "модератор",
+        ExecutorRole.head => "глава",
         _ => "без роли",
     };
 }

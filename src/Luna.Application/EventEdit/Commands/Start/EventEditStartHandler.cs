@@ -9,24 +9,24 @@ public class EventEditStartHandler
     : IRequestHandler<EventEditStartRequest, ErrorOr<bool>>
 {
     private readonly IEventRepository _eventRepository;
-    private readonly IUserRepository _userRepository;
+    private readonly IExecutorRepository _executorRepository;
     private readonly IEventEditRepository _eventEditRepository;
 
     public EventEditStartHandler(
         IEventRepository eventRepository,
-        IUserRepository userRepository,
+        IExecutorRepository executorRepository,
         IEventEditRepository eventEditRepository
     )
     {
         _eventRepository = eventRepository;
-        _userRepository = userRepository;
+        _executorRepository = executorRepository;
         _eventEditRepository = eventEditRepository;
     }
     
     public async Task<ErrorOr<bool>> Handle(
         EventEditStartRequest request, CancellationToken ct)
     {
-        var executor = await _userRepository
+        var executor = await _executorRepository
             .GetByDiscordIdAsync(request.ExecutorDiscordId, ct);
 
         if (executor is null)
@@ -34,7 +34,7 @@ public class EventEditStartHandler
                 "User.ExecutorNotFound", 
                 "Записи о вашем аккаунте не существует в репозитории.");
 
-        if (executor.Role < UserRole.Curator)
+        if (executor.Role < ExecutorRole.Curator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
@@ -55,7 +55,7 @@ public class EventEditStartHandler
                 " уже существует.");
         
         bool success = await _eventEditRepository
-            .StartAsync(ev.Id, executor.Id, ct);
+            .StartAsync(ev.Id, executor.UserId, ct);
         
         if (!success)
             return Error.Failure("Ошибка репозитория.");

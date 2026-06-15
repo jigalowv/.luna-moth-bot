@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Luna.Domain.Entities;
 
 public sealed class EventType
@@ -5,6 +7,8 @@ public sealed class EventType
     private EventType() { }
 
     public int Id { get; set; }
+    
+    [MaxLength(60)]
     public string Title { get; set; } = null!;
     public DateTime? CreatedAt { get; set; }
 

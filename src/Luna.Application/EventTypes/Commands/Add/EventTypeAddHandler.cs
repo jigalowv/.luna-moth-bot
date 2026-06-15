@@ -9,15 +9,15 @@ namespace Luna.Application.EventTypes.Commands.Add;
 public sealed class EventTypeAddHandler 
     : IRequestHandler<EventTypeAddRequest, ErrorOr<bool>>
 {
-    private readonly IUserRepository _userRepository;
+    private readonly IExecutorRepository _executorRepository;
     private readonly IEventTypeRepository _eventTypeRepository;
 
     public EventTypeAddHandler(
-        IUserRepository userRepository,
+        IExecutorRepository executorRepository,
         IEventTypeRepository eventTypeRepository
     )
     {
-        _userRepository = userRepository;
+        _executorRepository = executorRepository;
         _eventTypeRepository = eventTypeRepository;
     }
 
@@ -25,7 +25,7 @@ public sealed class EventTypeAddHandler
         EventTypeAddRequest request, 
         CancellationToken ct)
     {
-        var executor = await _userRepository
+        var executor = await _executorRepository
             .GetByDiscordIdAsync(request.ExecutorDiscordId, ct);
 
         if (executor is null)
@@ -33,11 +33,11 @@ public sealed class EventTypeAddHandler
                 "User.ExecutorNotFound", 
                 "Записи о вашем аккаунте не существует в репозитории.");
 
-        if (executor.Role < UserRole.Moderator)
+        if (executor.Role < ExecutorRole.Moderator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
-                    $"`{UserRole.Moderator}` или выше.");
+                    $"`модератор` или выше.");
         
         var normalizedTitle = request.Title.Trim().ToLower();
 

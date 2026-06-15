@@ -1,5 +1,4 @@
 using System.Text;
-using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using Luna.Application.EventEdit.Commands.Activities;
@@ -15,7 +14,6 @@ using Luna.Application.EventEdit.Commands.Show;
 using Luna.Application.EventEdit.Commands.Start;
 using Luna.Application.EventEdit.Commands.TakeControl;
 using Luna.Application.EventEdit.Commands.Type;
-using Luna.Domain.Entities;
 using Luna.Domain.Enums;
 using Luna.Presentation.Enums;
 using Luna.Presentation.Extensions;
@@ -41,7 +39,7 @@ public abstract class EventEditModule
     [SlashCommand("list", "Вывести все доступные процессы изменений.")]
     public async Task ListAsync()
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         
@@ -55,14 +53,15 @@ public abstract class EventEditModule
 
             if (response.IsError)
             {
-                await FollowupAsync(
-                    $"Ошибка: {response.Errors.First().Description}");
+                await FollowupAsync(embed: EmbedHelper
+                    .CreateError(response.Errors.First().Description).Build());
                 return;
             }
 
             if (response.Value.Items.Count == 0)
             {
-                await FollowupAsync($"Возвращено 0 записей.");
+                await FollowupAsync(embed: EmbedHelper
+                    .CreateError("Записей не найдено.").Build());
                 return;
             }
 
@@ -82,26 +81,27 @@ public abstract class EventEditModule
                   .AppendLine(creatorStr);
             }
 
-            var eb = new EmbedBuilder()
-                .WithDescription(sb.ToString())
-                .WithTitle("Процессы изменений:")
-                .WithColor(Color.Blue)
-                .WithCurrentTimestamp();
-
-            await FollowupAsync(embed: eb.Build());
+            await FollowupAsync(embed: EmbedHelper.CreateBase(
+                title: "Процессы изменений:",
+                description: sb.ToString()
+            ).Build());
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
-        
     }
 
     [SlashCommand("show", "Вывести информацию о редактируемом событии.")]
     public async Task ShowAsync([MinValue(1)]int? eventId = null)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         
@@ -116,8 +116,8 @@ public abstract class EventEditModule
 
             if (response.IsError)
             {
-                await FollowupAsync(
-                    $"Ошибка: {response.Errors.First().Description}");
+                await FollowupAsync(embed: EmbedHelper
+                    .CreateError(response.Errors.First().Description).Build());
                 return;
             }
 
@@ -134,14 +134,6 @@ public abstract class EventEditModule
             
             long endTS = ((DateTimeOffset)response.Value.EndAt)
                 .ToUnixTimeSeconds();
-
-            var eb = new EmbedBuilder()
-                .WithTitle(title)
-                .WithColor(Color.Blue)
-                .AddField("Начало", $"<t:{startTS}:f>", true)
-                .AddField("Конец", $"<t:{endTS}:f>", true )
-                .AddField("Создал", $"<@{response.Value.EventCreatorDiscordId}>", true)
-                .WithCurrentTimestamp();
 
             var sb = new StringBuilder()
                 .AppendLine("## Участники:");
@@ -165,14 +157,23 @@ public abstract class EventEditModule
 
                 sb.AppendLine($"- <@{member.DiscordId}>: {difference}");
             }
-
-            eb.WithDescription(sb.ToString());
             
-            await FollowupAsync(embed: eb.Build());
+            await FollowupAsync(embed: EmbedHelper.CreateBase(
+                title: title,
+                description: sb.ToString())
+                .AddField("Начало", $"<t:{startTS}:f>", true)
+                .AddField("Конец", $"<t:{endTS}:f>", true )
+                .AddField("Создал", 
+                    $"<@{response.Value.EventCreatorDiscordId}>", true).Build());
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -180,7 +181,7 @@ public abstract class EventEditModule
     [SlashCommand("start", "Начать процесс редактирования.")]
     public async Task StartAsync(int eventId)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         
@@ -193,13 +194,20 @@ public abstract class EventEditModule
             var response = await _mediator.Send(request, cts.Token);
             
             await response.Match(
-                success => FollowupAsync("Процесс редактирования начат."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+                success => FollowupAsync(embed: EmbedHelper.CreateUpdate(
+                    "Процесс изменения начат.").Build()),
+                errors => FollowupAsync(embed: EmbedHelper
+                    .CreateError(errors.First().Description).Build())
             );
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -210,7 +218,7 @@ public abstract class EventEditModule
         DiscordMemberRole role, 
         int? eventId = null)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         
@@ -225,13 +233,20 @@ public abstract class EventEditModule
             var response = await _mediator.Send(request, cts.Token);
             
             await response.Match(
-                success => FollowupAsync("Роль успешно обновлена."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+                success => FollowupAsync(embed: EmbedHelper.CreateUpdate(
+                    $"Роль изменена.").Build()),
+                errors => FollowupAsync(embed: EmbedHelper
+                    .CreateError(errors.First().Description).Build())
             );
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -243,14 +258,15 @@ public abstract class EventEditModule
         DiscordMemberRole role, 
         int? eventId = null)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         var parsedTargets = targets.ParseToUlongList();
 
         if (parsedTargets.Count == 0)
         {
-            await FollowupAsync(
-                "Ошибка: Не удалось распознать ни один Discord ID. Проверьте формат.");
+            await FollowupAsync(embed: EmbedHelper.CreateError(
+                "Не удалось распознать ни один Discord ID. Проверьте формат.")
+                .Build());
             return;
         }
 
@@ -267,13 +283,20 @@ public abstract class EventEditModule
             var response = await _mediator.Send(request, cts.Token);
             
             await response.Match(
-                success => FollowupAsync("Роли успешно обновлены."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+                success => FollowupAsync(embed: EmbedHelper
+                    .CreateUpdate("Роли изменены.").Build()),
+                errors => FollowupAsync(embed: EmbedHelper
+                    .CreateError(errors.First().Description).Build())
             );
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -281,7 +304,7 @@ public abstract class EventEditModule
     [SlashCommand("activity", "Установить статус активности участника события.")]
     public async Task ActivityAsync(SocketUser target, bool isActive, int? eventId = null)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         
@@ -296,13 +319,20 @@ public abstract class EventEditModule
             var response = await _mediator.Send(request, cts.Token);
             
             await response.Match(
-                success => FollowupAsync("Статус успешно обновлен."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+                success => FollowupAsync(embed: EmbedHelper
+                    .CreateUpdate("Статус активности изменён.").Build()),
+                errors => FollowupAsync(embed: EmbedHelper
+                    .CreateError(errors.First().Description).Build())
             );
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -314,14 +344,15 @@ public abstract class EventEditModule
         bool isActive, 
         int? eventId = null)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         var parsedTargets = targets.ParseToUlongList();
 
         if (parsedTargets.Count == 0)
         {
-            await FollowupAsync(
-                "Ошибка: Не удалось распознать ни один Discord ID. Проверьте формат.");
+            await FollowupAsync(embed: EmbedHelper.CreateError(
+                "Не удалось распознать ни один Discord ID. Проверьте формат.")
+                .Build());
             return;
         }
 
@@ -338,13 +369,20 @@ public abstract class EventEditModule
             var response = await _mediator.Send(request, cts.Token);
             
             await response.Match(
-                success => FollowupAsync("статусы активности успешно обновлены."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+                success => FollowupAsync(embed: EmbedHelper
+                    .CreateUpdate("Статусы активности изменены.").Build()),
+                errors => FollowupAsync(embed: EmbedHelper
+                    .CreateError(errors.First().Description).Build())
             );
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -354,7 +392,7 @@ public abstract class EventEditModule
         [Autocomplete(typeof(EventTypeAutocomplete))] string title, 
         int? eventId = null)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         
@@ -368,13 +406,20 @@ public abstract class EventEditModule
             var response = await _mediator.Send(request, cts.Token);
             
             await response.Match(
-                success => FollowupAsync("Тип события успешно обновлен."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+                success => FollowupAsync(embed: EmbedHelper
+                    .CreateUpdate("Тип события изменён.").Build()),
+                errors => FollowupAsync(embed: EmbedHelper
+                    .CreateError(errors.First().Description).Build())
             );
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -382,7 +427,7 @@ public abstract class EventEditModule
     [SlashCommand("takecontrol", "Получить контроль над процессом редактирования.")]
     public async Task TakeControlAsync(int eventId)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         
@@ -395,13 +440,20 @@ public abstract class EventEditModule
             var response = await _mediator.Send(request, cts.Token);
             
             await response.Match(
-                success => FollowupAsync("Контроль успешно получен."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+                success => FollowupAsync(embed: EmbedHelper.CreateUpdate(
+                    "Контроль над процессом изменения получен.").Build()),
+                errors => FollowupAsync(embed: EmbedHelper
+                    .CreateError(errors.First().Description).Build())
             );
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -409,7 +461,7 @@ public abstract class EventEditModule
     [SlashCommand("givecontrol", "Дать контроль над процессом редактирования.")]
     public async Task GiveControlAsync(SocketUser target, int? eventId = null)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         
@@ -423,13 +475,21 @@ public abstract class EventEditModule
             var response = await _mediator.Send(request, cts.Token);
             
             await response.Match(
-                success => FollowupAsync("Пользователь успешно получил контроль.."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+                success => FollowupAsync(embed: EmbedHelper.CreateUpdate(
+                    "Пользователь получил контроль на процессом изменения")
+                    .Build()),
+                errors => FollowupAsync(embed: EmbedHelper
+                    .CreateError(errors.First().Description).Build())
             );
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -437,7 +497,7 @@ public abstract class EventEditModule
     [SlashCommand("cancel", "Отменить процесс редактирования.")]
     public async Task CancelAsync(string? endCode = null, int? eventId = null)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         
@@ -452,23 +512,31 @@ public abstract class EventEditModule
             
             if (response.IsError)
             {
-                await FollowupAsync(
-                    $"Ошибка: {response.Errors.First().Description}");
+                await FollowupAsync(embed: EmbedHelper
+                    .CreateError(response.Errors.First().Description).Build());
                 return;
             }
 
             if (response.Value is not null)
             {
-                await FollowupAsync(
-                    $"Код ОТМЕНЫ: `{response.Value}`.");
+                await FollowupAsync(embed: EmbedHelper.CreateBase(
+                    title: "Код для ОТМЕНЫ процесса изменения",
+                    description: $"Значение: `{response.Value}`"
+                ).Build());
                 return;
             }
 
-            await FollowupAsync("Процесс редактирования отменён.");
+            await FollowupAsync(embed: EmbedHelper.CreateUpdate(
+                "Процесс редактирования отменён.").Build());
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -476,7 +544,7 @@ public abstract class EventEditModule
     [SlashCommand("delete", "Удалить событие")]
     public async Task DeleteAsync(string? endCode = null, int? eventId = null)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         
@@ -491,23 +559,31 @@ public abstract class EventEditModule
             
             if (response.IsError)
             {
-                await FollowupAsync(
-                    $"Ошибка: {response.Errors.First().Description}");
+                await FollowupAsync(embed: EmbedHelper
+                    .CreateError(response.Errors.First().Description).Build());
                 return;
             }
 
             if (response.Value is not null)
             {
-                await FollowupAsync(
-                    $"Код УДАЛЕНИЯ: `{response.Value}`.");
+                await FollowupAsync(embed: EmbedHelper.CreateBase(
+                    title: "Код для УДАЛЕНИЯ процесса изменения",
+                    description: $"Значение: `{response.Value}`"
+                ).Build());
                 return;
             }
 
-            await FollowupAsync("Событие удалено.");
+            await FollowupAsync(embed: EmbedHelper.CreateUpdate(
+                "Событие удалено.").Build());
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
         
@@ -516,7 +592,7 @@ public abstract class EventEditModule
     [SlashCommand("end", "Завершить процесс редактирования.")]
     public async Task EndAsync(string? endCode = null, int? eventId = null)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         
@@ -531,23 +607,31 @@ public abstract class EventEditModule
             
             if (response.IsError)
             {
-                await FollowupAsync(
-                    $"Ошибка: {response.Errors.First().Description}");
+                await FollowupAsync(embed: EmbedHelper
+                    .CreateError(response.Errors.First().Description).Build());
                 return;
             }
 
             if (response.Value is not null)
             {
-                await FollowupAsync(
-                    $"Код ПОДТВЕРЖДЕНИЯ: `{response.Value}`.");
+                await FollowupAsync(embed: EmbedHelper.CreateBase(
+                    title: "Код для ЗАВЕРШЕНИЯ процесса изменения",
+                    description: $"Значение: `{response.Value}`"
+                ).Build());
                 return;
             }
 
-            await FollowupAsync("Процесс редактирования завершён.");
+            await FollowupAsync(embed: EmbedHelper.CreateUpdate(
+                "Процесс изменения завершен.").Build());
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }

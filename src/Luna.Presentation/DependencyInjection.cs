@@ -12,6 +12,7 @@ namespace Luna.Presentation
             this IServiceCollection services,
             IConfiguration configuration)
         {
+            services.AddMemoryCache();
             services.Configure<DiscordOptions>(
                 configuration.GetSection(DiscordOptions.SectionName));
             services.AddSingleton(new DiscordSocketConfig

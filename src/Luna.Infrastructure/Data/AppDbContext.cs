@@ -1,13 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Luna.Domain.Entities;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using System.Globalization;
 
 namespace Luna.Infrastructure.Data
 {
     public class AppDbContext : DbContext
     {
-        public AppDbContext(DbContextOptions options)
+        public AppDbContext(DbContextOptions<AppDbContext> options)
             : base(options)
         { }
         
@@ -21,16 +20,19 @@ namespace Luna.Infrastructure.Data
         public DbSet<EventAttendance> EventAttendances { get; set; }
         public DbSet<EventEdit> EventEdits { get; set; }
         public DbSet<EventEditExecutor> EventEditExecutors { get; set; }
+        public DbSet<Executor> Executors { get; set; }
 
         protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
         {
             configurationBuilder
                 .Properties<DateTime>()
-                .HaveConversion<UtcDateTimeStringConverter>();
+                .HaveColumnType("timestamp without time zone")
+                .HaveConversion<UtcDateTimeConverter>();
 
             configurationBuilder
                 .Properties<DateTime?>()
-                .HaveConversion<UtcDateTimeStringConverter>();
+                .HaveColumnType("timestamp without time zone")
+                .HaveConversion<NullableUtcDateTimeConverter>();
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -43,18 +45,33 @@ namespace Luna.Infrastructure.Data
 
                 entity.Property(e => e.DiscordId)
                     .HasConversion(v => (long)v, v => (ulong)v)
-                    .IsRequired();
+                    .IsRequired(true);
 
                 entity.HasIndex(e => e.DiscordId)
-                    .IsUnique();
-
-                entity.Property(e => e.Role)
-                    .IsRequired();
+                    .IsUnique(true);
 
                 entity.Property(e => e.CreatedAt)
-                    .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                    .HasDefaultValueSql("timezone('utc', now())")
                     .ValueGeneratedOnAdd()
-                    .IsRequired();
+                    .IsRequired(true);
+            });
+
+            modelBuilder.Entity<Executor>(entity =>
+            {
+                entity.HasKey(e => e.UserId);
+
+                entity.HasOne(e => e.User)
+                    .WithOne()
+                    .HasForeignKey<Executor>(e => e.UserId);
+
+                entity.Property(e => e.Name)
+                    .IsRequired(true);
+                
+                entity.Property(e => e.ImageUrl)
+                    .IsRequired(false);
+
+                entity.Property(e => e.Role)
+                    .IsRequired(true);
             });
 
             modelBuilder.Entity<Record>(entity =>
@@ -67,15 +84,15 @@ namespace Luna.Infrastructure.Data
 
                 entity.HasIndex(e => e.ChannelId)
                     .IsUnique();
-
+                
                 entity.HasOne(e => e.Executor)
-                    .WithMany()
+                    .WithMany(e => e.Records)
                     .HasForeignKey(e => e.ExecutorId)
                     .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired();
 
                 entity.Property(e => e.StartAt)
-                    .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                    .HasDefaultValueSql("timezone('utc', now())")
                     .ValueGeneratedOnAdd()
                     .IsRequired();
             });
@@ -98,18 +115,14 @@ namespace Luna.Infrastructure.Data
                     .IsRequired();
 
                 entity.HasIndex(e => e.DiscordUserId);
-
-                entity.HasIndex(e => new
-                {
-                    e.RecordId,
-                    e.DiscordUserId
-                });
+                
+                entity.HasIndex(e => new { e.RecordId, e.DiscordUserId });
 
                 entity.Property(e => e.IsDeafened)
                     .IsRequired();
 
                 entity.Property(e => e.StartAt)
-                    .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                    .HasDefaultValueSql("timezone('utc', now())")
                     .ValueGeneratedOnAdd()
                     .IsRequired();
 
@@ -123,9 +136,12 @@ namespace Luna.Infrastructure.Data
                 
                 entity.Property(e => e.Title)
                     .IsRequired();
+
+                entity.HasIndex(e => e.Title)
+                    .IsUnique();
                 
                 entity.Property(e => e.CreatedAt)
-                    .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                    .HasDefaultValueSql("timezone('utc', now())")
                     .ValueGeneratedOnAdd()
                     .IsRequired();
             });
@@ -149,6 +165,8 @@ namespace Luna.Infrastructure.Data
                 entity.Property(e => e.StartAt)
                     .IsRequired();
                 
+                entity.HasIndex(e => e.StartAt).HasMethod("brin");
+
                 entity.Property(e => e.EndAt)
                     .IsRequired();
             });
@@ -224,13 +242,13 @@ namespace Luna.Infrastructure.Data
                     .WithOne()
                     .OnDelete(DeleteBehavior.Cascade)
                     .HasForeignKey<EventMemberEdit>(e => e.MemberId)
-                    .IsRequired(true);
+                    .IsRequired();
 
                 entity.HasOne(e => e.EventEdit)
                     .WithMany(e => e.MembersEdits)
                     .OnDelete(DeleteBehavior.Cascade)
                     .HasForeignKey(e => e.EventEditId)
-                    .IsRequired(true);
+                    .IsRequired();
                 
                 entity.Property(e => e.NewRole)
                     .IsRequired(false);
@@ -244,36 +262,38 @@ namespace Luna.Infrastructure.Data
                 entity.HasKey(e => new { e.EventEditId, e.ExecutorId });
 
                 entity.HasOne(e => e.EventEdit)
-                    .WithMany(e => e.Executors)
+                    .WithMany(e => e.EventEditExecutors)
                     .HasForeignKey(e => e.EventEditId)
                     .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired();
                 
                 entity.HasOne(e => e.Executor)
-                    .WithMany()
+                    .WithMany(e => e.EventEditExecutors)
                     .HasForeignKey(e => e.ExecutorId)
                     .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired();
 
                 entity.Property(e => e.CreatedAt)
-                    .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                    .HasDefaultValueSql("timezone('utc', now())")
                     .ValueGeneratedOnAdd()
                     .IsRequired();
             });
         }
     }
-}
 
-public class UtcDateTimeStringConverter : ValueConverter<DateTime, string>
-{
-    private const string Format = "yyyy-MM-dd HH:mm:ss";
-
-    public UtcDateTimeStringConverter() : base(
-        v => v.ToString(Format, CultureInfo.InvariantCulture),
-        v => DateTime.SpecifyKind(
-            DateTime.ParseExact(v, Format, CultureInfo.InvariantCulture), 
-            DateTimeKind.Utc
-        ))
+    public class UtcDateTimeConverter : ValueConverter<DateTime, DateTime>
     {
+        public UtcDateTimeConverter() 
+            : base(
+                v => DateTime.SpecifyKind(v, DateTimeKind.Unspecified), 
+                v => DateTime.SpecifyKind(v, DateTimeKind.Utc)) { }
+    }
+
+    public class NullableUtcDateTimeConverter : ValueConverter<DateTime?, DateTime?>
+    {
+        public NullableUtcDateTimeConverter() 
+            : base(
+                v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Unspecified) : null, 
+                v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null) { }
     }
 }

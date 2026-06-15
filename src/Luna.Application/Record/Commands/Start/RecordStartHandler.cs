@@ -9,15 +9,15 @@ namespace Luna.Application.Record.Commands.Start;
 public sealed class RecordStartHandler 
     : IRequestHandler<RecordStartRequest, ErrorOr<bool>>
 {
-    private IUserRepository _userRepository;
+    private IExecutorRepository _executorRepository;
     private IRecordRepository _recordRepository;
 
     public RecordStartHandler(
-        IUserRepository userRepository,
+        IExecutorRepository executorRepository,
         IRecordRepository recordRepository
     )
     {
-        _userRepository = userRepository;
+        _executorRepository = executorRepository;
         _recordRepository = recordRepository;
     }
 
@@ -25,7 +25,7 @@ public sealed class RecordStartHandler
         RecordStartRequest request, 
         CancellationToken ct)
     {
-        var executor = await _userRepository
+        var executor = await _executorRepository
             .GetByDiscordIdAsync(request.ExecutorDiscordId, ct);
 
         if (executor is null)
@@ -33,11 +33,11 @@ public sealed class RecordStartHandler
                 "User.ExecutorNotFound", 
                 "Записи о вашем аккаунте не существует в репозитории.");
 
-        if (executor.Role < UserRole.Curator)
+        if (executor.Role < ExecutorRole.Curator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
-                    $"`{UserRole.Curator}` или выше.");
+                    $"`{ExecutorRole.Curator}` или выше.");
             
         var record = await _recordRepository
             .GetAsync(request.ChannelId, ct);
@@ -49,7 +49,7 @@ public sealed class RecordStartHandler
 
         record = Domain.Entities.Record.Create(
             channelId: request.ChannelId,
-            executorId: executor.Id);
+            executorId: executor.UserId);
 
         List<RecordAttendance> recordAttendances = [];
 

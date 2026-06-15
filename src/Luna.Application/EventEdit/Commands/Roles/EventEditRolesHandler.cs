@@ -8,14 +8,17 @@ namespace Luna.Application.EventEdit.Commands.Roles;
 public class EventEditRolesHandler 
     : IRequestHandler<EventEditRolesRequest, ErrorOr<bool>>
 {
+    private readonly IExecutorRepository _executorRepository;
     private readonly IUserRepository _userRepository;
     private readonly IEventEditRepository _eventEditRepository;
 
     public EventEditRolesHandler(
+        IExecutorRepository executorRepository,
         IUserRepository userRepository,
         IEventEditRepository eventEditRepository
     )
     {
+        _executorRepository = executorRepository;
         _userRepository = userRepository;
         _eventEditRepository = eventEditRepository;
     }
@@ -24,7 +27,7 @@ public class EventEditRolesHandler
         EventEditRolesRequest request, 
         CancellationToken ct)
     {
-        var executor = await _userRepository
+        var executor = await _executorRepository
             .GetByDiscordIdAsync(request.ExecutorDiscordId, ct);
 
         if (executor is null)
@@ -32,7 +35,7 @@ public class EventEditRolesHandler
                 "User.ExecutorNotFound", 
                 "Записи о вашем аккаунте не существует в репозитории.");
 
-        if (executor.Role < UserRole.Curator)
+        if (executor.Role < ExecutorRole.Curator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
@@ -40,7 +43,7 @@ public class EventEditRolesHandler
 
         Domain.Entities.EventEdit? eventEdit = request.EventId is null ?
             await _eventEditRepository
-                .GetLastByExecutorIdAsync(executor.Id, ct) :
+                .GetLastByExecutorIdAsync(executor.UserId, ct) :
             await _eventEditRepository
                 .GetAsync(request.EventId.Value, ct);
 

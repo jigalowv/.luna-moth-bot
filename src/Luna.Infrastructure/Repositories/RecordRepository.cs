@@ -113,6 +113,7 @@ public sealed class RecordRepository : IRecordRepository
         await _context.Records
             .AsNoTracking()
             .Include(i => i.Executor)
+                .ThenInclude(i => i.User)
             .ToListAsync(ct);
 
     public async Task<bool> SetNewChannel(
@@ -208,7 +209,7 @@ public sealed class RecordRepository : IRecordRepository
             {
                 if (!existingUsers.ContainsKey(discordId))
                 {
-                    var newUser = User.Create(discordId, UserRole.None);
+                    var newUser = new User { DiscordId = discordId };
                     _context.Users.Add(newUser);
                     existingUsers.Add(discordId, newUser);
                 }
@@ -266,10 +267,10 @@ public sealed class RecordRepository : IRecordRepository
                     RandomNumberGenerator.GetBytes(3)),
                 EventId = newEvent.Id,
                 MembersEdits = [],
-                Executors = []
+                EventEditExecutors = []
             };
 
-            eventEdit.Executors.Add(new EventEditExecutor
+            eventEdit.EventEditExecutors.Add(new EventEditExecutor
             {
                 ExecutorId = executorId
             });

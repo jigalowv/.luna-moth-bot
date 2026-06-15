@@ -9,15 +9,15 @@ namespace Luna.Application.EventEdit.Commands.Show;
 public class EventEditShowHandler 
     : IRequestHandler<EventEditShowRequest, ErrorOr<EventEditShowResponse>>
 {
-    private readonly IUserRepository _userRepository;
+    private readonly IExecutorRepository _executorRepository;
     private readonly IEventEditRepository _eventEditRepository;
 
     public EventEditShowHandler(
-        IUserRepository userRepository,
+        IExecutorRepository executorRepository,
         IEventEditRepository eventEditRepository
     )
     {
-        _userRepository = userRepository;
+        _executorRepository = executorRepository;
         _eventEditRepository = eventEditRepository;
     }
     
@@ -25,7 +25,7 @@ public class EventEditShowHandler
         EventEditShowRequest request, 
         CancellationToken ct)
     {
-        var executor = await _userRepository
+        var executor = await _executorRepository
             .GetByDiscordIdAsync(request.ExecutorDiscordId, ct);
 
         if (executor is null)
@@ -33,7 +33,7 @@ public class EventEditShowHandler
                 "User.ExecutorNotFound", 
                 "Записи о вашем аккаунте не существует в репозитории.");
 
-        if (executor.Role < UserRole.Curator)
+        if (executor.Role < ExecutorRole.Curator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
@@ -41,7 +41,7 @@ public class EventEditShowHandler
 
         Domain.Entities.EventEdit? eventEdit = request.EventId is null ?
             await _eventEditRepository
-                .GetLastByExecutorIdWithDetailsAsync(executor.Id, ct) :
+                .GetLastByExecutorIdWithDetailsAsync(executor.UserId, ct) :
             await _eventEditRepository
                 .GetWithDetailsAsync(request.EventId.Value, ct);
 
@@ -79,7 +79,7 @@ public class EventEditShowHandler
                 Before: eventEdit.Event.Type.Title, 
                 After: eventEdit.NewEventType?.Title),
             Members: members,
-            EventCreatorDiscordId: eventEdit.Event.Creator.DiscordId,
+            EventCreatorDiscordId: eventEdit.Event.Creator.User.DiscordId,
             StartAt: eventEdit.Event.StartAt,
             EndAt: eventEdit.Event.EndAt);
     }

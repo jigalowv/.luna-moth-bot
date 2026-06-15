@@ -20,7 +20,7 @@ public class UserRepository : IUserRepository
         _logger = logger;
     }
 
-    public async Task<bool> AddUserAsync(
+    public async Task<bool> AddAsync(
         User newUser, 
         CancellationToken ct)
     {
@@ -71,36 +71,7 @@ public class UserRepository : IUserRepository
         CancellationToken ct)
     {
         return await _context.Users
+            .AsNoTracking()
             .FirstOrDefaultAsync(u => u.DiscordId == discordId, ct);
-    }
-
-    public async Task<bool> SetUserRoleAsync(
-        ulong discordId, 
-        UserRole role, 
-        CancellationToken ct)
-    {
-        try
-        {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.DiscordId == discordId, ct);
-
-            if (user is not null)
-            {
-                user?.SetRole(role);
-                await _context.SaveChangesAsync(ct);
-                return true;
-            }
-            else throw new KeyNotFoundException(
-                $"User not found: Discord ID = {discordId}");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, 
-                "Error occurred while updating a role " + 
-                "of a user with Discord ID: {DiscordId}", 
-                discordId);
-
-            return false;
-        }
     }
 }

@@ -8,15 +8,15 @@ namespace Luna.Application.Record.Commands.Move;
 
 public class RecordMoveHandler : IRequestHandler<RecordMoveRequest, ErrorOr<bool>>
 {
-    private readonly IUserRepository _userRepository;
+    private readonly IExecutorRepository _executorRepository;
     private readonly IRecordRepository _recordRepository;
 
     public RecordMoveHandler(
-        IUserRepository userRepository,
+        IExecutorRepository executorRepository,
         IRecordRepository recordRepository
     )
     {
-        _userRepository = userRepository;
+        _executorRepository = executorRepository;
         _recordRepository = recordRepository;
     }
     
@@ -24,7 +24,7 @@ public class RecordMoveHandler : IRequestHandler<RecordMoveRequest, ErrorOr<bool
         RecordMoveRequest request, 
         CancellationToken ct)
     {
-        var executor = await _userRepository
+        var executor = await _executorRepository
             .GetByDiscordIdAsync(request.ExecutorDiscordId, ct);
 
         if (executor is null)
@@ -32,11 +32,11 @@ public class RecordMoveHandler : IRequestHandler<RecordMoveRequest, ErrorOr<bool
                 "User.ExecutorNotFound", 
                 "Записи о вашем аккаунте не существует в репозитории.");
 
-        if (executor.Role < UserRole.Curator)
+        if (executor.Role < ExecutorRole.Curator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
-                    $"`{UserRole.Curator}` или выше.");
+                    $"`{ExecutorRole.Curator}` или выше.");
         
         var oldChannel = await _recordRepository
             .GetAsync(request.OldChannelId, ct);
@@ -47,12 +47,12 @@ public class RecordMoveHandler : IRequestHandler<RecordMoveRequest, ErrorOr<bool
                 $"Запись канала (`{request.OldChannelId}`) " + 
                 "не найдена в репозитории.");
 
-        if (executor.Role == UserRole.Curator &&
-            executor.Id != oldChannel.ExecutorId)
+        if (executor.Role == ExecutorRole.Curator &&
+            executor.UserId != oldChannel.ExecutorId)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Если роль исполнителя " + 
-                $"`{UserRole.Curator}`, то он может использовать " + 
+                $"`{ExecutorRole.Curator}`, то он может использовать " + 
                 "эту команду только на свои записи.");
 
         var newChannelId = await _recordRepository

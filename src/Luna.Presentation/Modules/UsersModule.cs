@@ -1,10 +1,8 @@
 using Discord.Interactions;
 using Discord.WebSocket;
 using MediatR;
-using Luna.Application.Users.Commands.AddUser;
-using Luna.Application.Users.Commands.SetUserRole;
-using Luna.Domain.Enums;
-using Luna.Presentation.Enums;
+using Luna.Application.Users.Commands.Add;
+using Luna.Presentation.Extensions;
 
 namespace Luna.Presentation.Modules;
 
@@ -12,14 +10,18 @@ namespace Luna.Presentation.Modules;
 public sealed class UsersModule : InteractionModuleBase<SocketInteractionContext>
 {
     private readonly IMediator _mediator;
+    private readonly ILogger<UsersModule> _logger;
 
-    public UsersModule(IMediator mediator)
+    public UsersModule(
+        ILogger<UsersModule> logger,
+        IMediator mediator)
     {
+        _logger = logger;
         _mediator = mediator;
     }
 
     [SlashCommand("add", "добавляет пользователя в базу данных.")]
-    public async Task AddAsync(SocketUser user, SetUserRole role = SetUserRole.None)
+    public async Task AddAsync(SocketUser user)
     {
         await DeferAsync(ephemeral: true);
 
@@ -27,48 +29,28 @@ public sealed class UsersModule : InteractionModuleBase<SocketInteractionContext
 
         try
         {
-            var request = new AddUserRequest(
+            var request = new UserAddRequest(
                 ExecutorDiscordId: Context.User.Id, 
-                DiscordId: user.Id,
-                Role: (UserRole)role);
+                DiscordId: user.Id);
 
             var result = await _mediator.Send(request, cts.Token);
             
             await result.Match(
-                success => FollowupAsync("Успешно добавлен."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+                success => FollowupAsync(embed: EmbedHelper
+                    .CreateUpdate("Пользователь добавлен.").Build()),
+                errors => FollowupAsync(embed: EmbedHelper
+                    .CreateError(errors.First().Description).Build())
             );
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
-        }
-    }
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
 
-    [SlashCommand("setrole", "устанавливает новую роль для пользователя.")]
-    public async Task SetRoleAsync(SocketUser user, SetUserRole newRole)
-    {
-        await DeferAsync(ephemeral: true);
-
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-
-        try
-        {
-            var request = new SetUserRoleRequest(
-                ExecutorDiscordId: Context.User.Id, 
-                DiscordId: user.Id, 
-                NewRole: (UserRole)newRole);
-
-            var result = await _mediator.Send(request, cts.Token);
-
-            await result.Match(
-                success => FollowupAsync("Роль успешно обновлена."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
-            );
-        }
-        catch (Exception)
-        {
-            await FollowupAsync("The request timed out. Please try again later.");
+            _logger.LogError(ex, "Command Error");
         }
     }
 }

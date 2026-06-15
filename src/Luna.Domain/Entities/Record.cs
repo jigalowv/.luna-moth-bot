@@ -8,7 +8,7 @@ public sealed class Record
     public ulong ChannelId { get; set; }
     public int ExecutorId { get; set; }
     public DateTime? StartAt { get; set; }
-    public User Executor { get; set; } = null!;
+    public Executor Executor { get; set; } = null!;
 
     public ICollection<RecordAttendance> Attendances { get; private set; } = [];
 

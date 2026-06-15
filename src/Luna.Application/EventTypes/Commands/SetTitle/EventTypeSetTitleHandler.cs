@@ -8,14 +8,14 @@ namespace Luna.Application.EventTypes.Commands.SetTitle;
 public class EventTypeSetTitleHandler
     : IRequestHandler<EventTypeSetTitleRequest, ErrorOr<bool>>
 {
-    private readonly IUserRepository _userRepository;
+    private readonly IExecutorRepository _executorRepository;
     private readonly IEventTypeRepository _eventTypeRepository;
 
     public EventTypeSetTitleHandler(
-        IUserRepository userRepository,
+        IExecutorRepository executorRepository,
         IEventTypeRepository eventTypeRepository)
     {
-        _userRepository = userRepository;
+        _executorRepository = executorRepository;
         _eventTypeRepository = eventTypeRepository;
     }
     
@@ -23,7 +23,7 @@ public class EventTypeSetTitleHandler
         EventTypeSetTitleRequest request, 
         CancellationToken ct)
     {
-        var executor = await _userRepository
+        var executor = await _executorRepository
             .GetByDiscordIdAsync(request.ExecutorDiscordId, ct);
 
         if (executor is null)
@@ -31,11 +31,11 @@ public class EventTypeSetTitleHandler
                 "User.ExecutorNotFound", 
                 "Записи о вашем аккаунте не существует в репозитории.");
 
-        if (executor.Role < UserRole.Moderator)
+        if (executor.Role < ExecutorRole.Moderator)
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
-                    $"`{UserRole.Moderator}` или выше.");
+                    $"`модератор` или выше.");
 
         var normalizedOldTitle = request.OldTitle.Trim().ToLower();
         var normalizedNewTitle = request.NewTitle.Trim().ToLower();

@@ -11,6 +11,7 @@ using Luna.Application.Record.Commands.Move;
 using Luna.Application.Record.Commands.End;
 using Luna.Domain.Enums;
 using Luna.Presentation.Enums;
+using Luna.Presentation.Extensions;
 
 namespace Luna.Presentation.Modules;
 
@@ -33,7 +34,7 @@ public sealed class RecordModule
     [SlashCommand("start", "Начать запись.")]
     public async Task StartAsync(SocketVoiceChannel channel)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
@@ -41,7 +42,8 @@ public sealed class RecordModule
             channel.ChannelType != ChannelType.Voice &&
             channel.ChannelType != ChannelType.Stage)
         {
-            await FollowupAsync("Выберите ГОЛОСОВОЙ канал или ТРИБУНУ.");
+            await FollowupAsync(embed: EmbedHelper.CreateError(
+                "Выберите ГОЛОСОВОЙ канал или ТРИБУНУ.").Build());
             return;
         }
 
@@ -63,13 +65,20 @@ public sealed class RecordModule
             var response = await _mediator.Send(request, cts.Token);
             
             await response.Match(
-                success => FollowupAsync("Запись начата."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+                success => FollowupAsync(embed: EmbedHelper
+                    .CreateUpdate("Запись начата.").Build()),
+                errors => FollowupAsync(embed: EmbedHelper
+                    .CreateError(errors.First().Description).Build())
             );
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -77,7 +86,7 @@ public sealed class RecordModule
     [SlashCommand("cancel", "Отменить запись.")]
     public async Task CancelAsync(SocketVoiceChannel channel)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
@@ -85,7 +94,8 @@ public sealed class RecordModule
             channel.ChannelType != ChannelType.Voice &&
             channel.ChannelType != ChannelType.Stage)
         {
-            await FollowupAsync("Выберите ГОЛОСОВОЙ канал или ТРИБУНУ.");
+            await FollowupAsync(embed: EmbedHelper.CreateError(
+                "Выберите ГОЛОСОВОЙ канал или ТРИБУНУ.").Build());
             return;
         }
 
@@ -94,45 +104,54 @@ public sealed class RecordModule
             var request = new RecordCancelRequest(
                 ExecutorDiscordId: Context.User.Id,
                 ChannelId: channel.Id);
-            
-            var eb = new EmbedBuilder()
-                .WithTitle($"Участники ({channel.Mention})")
-                .WithCurrentTimestamp();
 
             var response = await _mediator.Send(request, cts.Token);
 
-            var sb = new StringBuilder();
-
-            if (response.IsSuccess)
+            if (response.IsError)
             {
-                var deafenDurations = response.Value.UserDeafenDurations;
-                var notDeafenDurations = response.Value.UserNotDeafenDurations;
-
-                var allKeys = notDeafenDurations.Keys.Union(deafenDurations.Keys);
-
-                foreach (var key in allKeys)
-                {
-                    var notDeafenTime = notDeafenDurations.GetValueOrDefault(key, TimeSpan.Zero);
-                    var deafenTime = deafenDurations.GetValueOrDefault(key, TimeSpan.Zero);
-
-                    sb.Append($"- {notDeafenTime.ToString(@"h\:mm\:ss")}")
-                      .Append($" (:mute:: {deafenTime.ToString(@"h\:mm\:ss")})")
-                      .Append($": <@{key}>")
-                      .AppendLine();
-                }
-
-                eb.WithDescription(sb.ToString())
-                  .WithColor(Color.Blue);
+                await FollowupAsync(embed: EmbedHelper.CreateError(
+                    $"{response.Errors.First().Description}").Build());
+                return;
             }
 
-            await response.Match(
-                success => FollowupAsync(embed: eb.Build()),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
-            );
+            var deafenDurations = response.Value.UserDeafenDurations;
+            var notDeafenDurations = response.Value.UserNotDeafenDurations;
+
+            var allKeys = notDeafenDurations.Keys.Union(deafenDurations.Keys);
+
+            var sb = new StringBuilder();
+
+            foreach (var key in allKeys)
+            {
+                var notDeafenTime = notDeafenDurations
+                    .GetValueOrDefault(key, TimeSpan.Zero);
+                
+                var deafenTime = deafenDurations
+                    .GetValueOrDefault(key, TimeSpan.Zero);
+
+                sb.Append($"- {notDeafenTime.ToString(@"h\:mm\:ss")}")
+                    .Append($" (:mute:: {deafenTime.ToString(@"h\:mm\:ss")})")
+                    .Append($": <@{key}>")
+                    .AppendLine();
+            }
+            
+            await FollowupAsync(embed: EmbedHelper.CreateUpdate(
+                $"""
+                Запись **отменена**.
+
+                ### Участники ({channel.Mention}):
+                {sb}
+                """
+            ).Build());
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -140,7 +159,7 @@ public sealed class RecordModule
     [SlashCommand("users", "Вывести список записанных пользователей.")]
     public async Task UsersAsync(SocketVoiceChannel? channel = null)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
@@ -148,7 +167,9 @@ public sealed class RecordModule
             channel.ChannelType != ChannelType.Voice &&
             channel.ChannelType != ChannelType.Stage)
         {
-            await FollowupAsync("Select a VOICE or STAGE channel.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError("Выберите ГОЛОСОВОЙ канал или ТРИБУНУ.").Build());
+            await FollowupAsync(embed: EmbedHelper.CreateError("Выберите ГОЛОСОВОЙ канал или ТРИБУНУ.").Build());
             return;
         }
 
@@ -158,44 +179,46 @@ public sealed class RecordModule
                 ExecutorDiscordId: Context.User.Id,
                 ChannelId: channel?.Id);
 
-            var result = await _mediator.Send(request, cts.Token);
+            var response = await _mediator.Send(request, cts.Token);
             
-            var sb = new StringBuilder();
-            var eb = new EmbedBuilder()
-                .WithCurrentTimestamp();
-
-            if (result.IsSuccess)
-            {   
-                eb.WithTitle($"Участники (<#{result.Value.ChannelId}>)");
-
-                var deafenDurations = result.Value.UserDeafenDurations;
-                var notDeafenDurations = result.Value.UserNotDeafenDurations;
-
-                var allKeys = notDeafenDurations.Keys.Union(deafenDurations.Keys);
-
-                foreach (var key in allKeys)
-                {
-                    var notDeafenTime = notDeafenDurations.GetValueOrDefault(key, TimeSpan.Zero);
-                    var deafenTime = deafenDurations.GetValueOrDefault(key, TimeSpan.Zero);
-
-                    sb.Append($"- {notDeafenTime.ToString(@"h\:mm\:ss")}")
-                      .Append($" (:mute:: {deafenTime.ToString(@"h\:mm\:ss")})")
-                      .Append($": <@{key}>")
-                      .AppendLine();
-                }
-
-                eb.WithDescription(sb.ToString())
-                  .WithColor(Color.Blue);
+            if (response.IsError)
+            {
+                await FollowupAsync(embed: EmbedHelper.CreateError(
+                    $"{response.Errors.First().Description}").Build());
+                return;
             }
 
-            await result.Match(
-                success => FollowupAsync(embed: eb.Build()),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
-            );
+            var deafenDurations = response.Value.UserDeafenDurations;
+            var notDeafenDurations = response.Value.UserNotDeafenDurations;
+
+            var allKeys = notDeafenDurations.Keys.Union(deafenDurations.Keys);
+
+            var sb = new StringBuilder();
+
+            foreach (var key in allKeys)
+            {
+                var notDeafenTime = notDeafenDurations.GetValueOrDefault(key, TimeSpan.Zero);
+                var deafenTime = deafenDurations.GetValueOrDefault(key, TimeSpan.Zero);
+
+                sb.Append($"- {notDeafenTime.ToString(@"h\:mm\:ss")}")
+                    .Append($" (:mute:: {deafenTime.ToString(@"h\:mm\:ss")})")
+                    .Append($": <@{key}>")
+                    .AppendLine();
+            }
+
+            await FollowupAsync(embed: EmbedHelper.CreateBase(
+                title: $"Участники (<#{response.Value.ChannelId}>)",
+                description: sb.ToString()
+            ).Build());
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -203,7 +226,7 @@ public sealed class RecordModule
     [SlashCommand("list", "Вывести список записей.")]
     public async Task ListAsync()
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
@@ -217,14 +240,16 @@ public sealed class RecordModule
 
             if (response.IsError)
             {
-                await FollowupAsync(
-                    $"{response.Errors.First().Description}");
+                await FollowupAsync(embed: EmbedHelper
+                    .CreateError($"{response.Errors.First().Description}")
+                    .Build());
                 return;
             }
 
             if (response.Value.Items.Count == 0)
             {
-                await FollowupAsync($"Возвращено 0 записей.");
+                await FollowupAsync(embed: EmbedHelper
+                    .CreateError("Записей событий не найдено.").Build());
                 return;
             }
 
@@ -238,17 +263,19 @@ public sealed class RecordModule
                 sb.AppendLine($"- (`{duration}`): <#{item.ChannelId}> (`{item.ChannelId}`): {own}");
             }
 
-            var eb = new EmbedBuilder()
-                .WithTitle("Записи")
-                .WithColor(Color.Blue)
-                .WithDescription(sb.ToString())
-                .WithCurrentTimestamp();
-
-            await FollowupAsync(embed: eb.Build());
+            await FollowupAsync(embed: EmbedHelper.CreateBase(
+                title: "Записи",
+                description: sb.ToString()
+            ).Build());
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -258,22 +285,25 @@ public sealed class RecordModule
         [Summary("old-channel-id")] string oldChannelIdStr, 
         SocketVoiceChannel newChannel)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         bool success = ulong
             .TryParse(oldChannelIdStr, out ulong oldChannelId);
         
         if (!success)
-            await FollowupAsync(
-                "Неправильный формат для old-channel-id");
+        {
+            await FollowupAsync(embed: EmbedHelper.CreateError(
+                "Неправильный формат для old-channel-id").Build());
+            return;
+        }
         
         if (newChannel is null ||
             newChannel.ChannelType != ChannelType.Voice &&
             newChannel.ChannelType != ChannelType.Stage)
         {
-            await FollowupAsync(
+            await FollowupAsync(embed: EmbedHelper.CreateError(
                 "В качестве нового канала выберите " + 
-                "ГОЛОСОВОЙ канал или ТРИБУНУ.");
+                "ГОЛОСОВОЙ канал или ТРИБУНУ.").Build());
             return;
         }
 
@@ -298,13 +328,22 @@ public sealed class RecordModule
             var response = await _mediator.Send(request, cts.Token);
 
             await response.Match(
-                success => FollowupAsync("Запись изменена."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+                success => FollowupAsync(embed: EmbedHelper
+                    .CreateUpdate("Запись была перемещена:" + 
+                        $" <#{oldChannelIdStr}> → {newChannel.Mention}")
+                    .Build()),
+                errors => FollowupAsync(embed: EmbedHelper
+                    .CreateError(errors.First().Description).Build())
             );
         }
         catch (Exception ex)
         {
-            await FollowupAsync("The request timed out. Please try again later.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
             _logger.LogError(ex, "Command Error");
         }
     }
@@ -318,7 +357,7 @@ public sealed class RecordModule
         [Summary("role", "Роль участников")] AllowedEndRoles? role = null,
         [Summary("min-duration", "Минимальная длительность")] int? minDuration = null)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
@@ -326,7 +365,8 @@ public sealed class RecordModule
             channel.ChannelType != ChannelType.Voice &&
             channel.ChannelType != ChannelType.Stage)
         {
-            await FollowupAsync("Select a VOICE or STAGE channel.");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError("Выберите ГОЛОСОВОЙ канал или ТРИБУНУ.").Build());
             return;
         }
 
@@ -343,14 +383,24 @@ public sealed class RecordModule
             var response = await _mediator.Send(request, cts.Token);
 
             await response.Match(
-                success => FollowupAsync("Запись успешно завершена и событие создано."),
-                errors => FollowupAsync($"Ошибка: {errors.First().Description}")
+                success => FollowupAsync(embed: EmbedHelper
+                .CreateUpdate("""
+                - Запись успешно завершена. 
+                - Событие создано.
+                """).Build()),
+                errors => FollowupAsync(embed: EmbedHelper
+                    .CreateError(errors.First().Description).Build())
             );
         }
         catch (Exception ex)
         {
-            await FollowupAsync("Время ожидания запроса истекло. Попробуйте позже.");
-            _logger.LogError(ex, "Ошибка при выполнении команды /end");
+            await FollowupAsync(embed: EmbedHelper
+                .CreateError(
+                    "Время ожидания запроса истекло. " + 
+                    "Пожалуйста, попробуйте позже.")
+                .Build());
+
+            _logger.LogError(ex, "Command Error");
         }
     }
 }

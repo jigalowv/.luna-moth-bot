@@ -15,12 +15,13 @@ public static class DependencyInjection
     {
         services.AddDbContext<AppDbContext>(options =>
         {
-            options.UseSqlite(configuration.GetConnectionString("Default"));
+            options.UseNpgsql(configuration.GetConnectionString("Default"));
             options.UseSnakeCaseNamingConvention();
         });
         
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IExecutorRepository, ExecutorRepository>();
         services.AddScoped<IEventEditRepository, EventEditRepository>();
         services.AddScoped<IEventTypeRepository, EventTypeRepository>();
         services.AddScoped<IRecordAttendanceRepository, RecordAttendanceRepository>();
