@@ -48,19 +48,8 @@ public sealed class InteractionHandler
         
         try
         {
-            #if DEBUG
-                await _interactionService.RegisterCommandsToGuildAsync(TrackedGuildId1);
-                _logger.LogInformation("Commands registered locally to guild: {GuildId}", TrackedGuildId1);
-                
-                await _interactionService.RegisterCommandsToGuildAsync(TrackedGuildId2);
-                _logger.LogInformation("Commands registered locally to guild: {GuildId}", TrackedGuildId2);
-
-                await _interactionService.RegisterCommandsToGuildAsync(TrackedGuildId3);
-                _logger.LogInformation("Commands registered locally to guild: {GuildId}", TrackedGuildId3);
-            #else
-                await _interactionService.RegisterCommandsGloballyAsync();
-                _logger.LogInformation("Commands registered globally.");
-            #endif
+            await _interactionService.RegisterCommandsGloballyAsync();
+            _logger.LogInformation("Commands registered globally.");
         }
         catch (Exception ex)
         {

@@ -81,7 +81,7 @@ public abstract class EventEditModule
                   .AppendLine(creatorStr);
             }
 
-            await FollowupAsync(embed: EmbedHelper.CreateBase(
+            await FollowupAsync(embed: EmbedHelper.CreateBaseWithTitle(
                 title: "Процессы изменений:",
                 description: sb.ToString()
             ).Build());
@@ -158,7 +158,7 @@ public abstract class EventEditModule
                 sb.AppendLine($"- <@{member.DiscordId}>: {difference}");
             }
             
-            await FollowupAsync(embed: EmbedHelper.CreateBase(
+            await FollowupAsync(embed: EmbedHelper.CreateBaseWithTitle(
                 title: title,
                 description: sb.ToString())
                 .AddField("Начало", $"<t:{startTS}:f>", true)
@@ -519,7 +519,7 @@ public abstract class EventEditModule
 
             if (response.Value is not null)
             {
-                await FollowupAsync(embed: EmbedHelper.CreateBase(
+                await FollowupAsync(embed: EmbedHelper.CreateBaseWithTitle(
                     title: "Код для ОТМЕНЫ процесса изменения",
                     description: $"Значение: `{response.Value}`"
                 ).Build());
@@ -566,7 +566,7 @@ public abstract class EventEditModule
 
             if (response.Value is not null)
             {
-                await FollowupAsync(embed: EmbedHelper.CreateBase(
+                await FollowupAsync(embed: EmbedHelper.CreateBaseWithTitle(
                     title: "Код для УДАЛЕНИЯ процесса изменения",
                     description: $"Значение: `{response.Value}`"
                 ).Build());
@@ -614,7 +614,7 @@ public abstract class EventEditModule
 
             if (response.Value is not null)
             {
-                await FollowupAsync(embed: EmbedHelper.CreateBase(
+                await FollowupAsync(embed: EmbedHelper.CreateBaseWithTitle(
                     title: "Код для ЗАВЕРШЕНИЯ процесса изменения",
                     description: $"Значение: `{response.Value}`"
                 ).Build());

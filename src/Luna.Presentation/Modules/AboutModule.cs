@@ -8,7 +8,7 @@ public class AboutModule : InteractionModuleBase<SocketInteractionContext>
     [SlashCommand("about", "информация о боте")]
     public async Task AboutAsync()
     {
-        var eb = EmbedHelper.CreateBase(
+        var eb = EmbedHelper.CreateBaseWithTitle(
             title: "luna moth",
             description: """
             Менеджер событий "Лампового Уголка".

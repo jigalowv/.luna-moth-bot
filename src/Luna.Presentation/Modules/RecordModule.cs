@@ -206,7 +206,7 @@ public sealed class RecordModule
                     .AppendLine();
             }
 
-            await FollowupAsync(embed: EmbedHelper.CreateBase(
+            await FollowupAsync(embed: EmbedHelper.CreateBaseWithTitle(
                 title: $"Участники (<#{response.Value.ChannelId}>)",
                 description: sb.ToString()
             ).Build());
@@ -263,7 +263,7 @@ public sealed class RecordModule
                 sb.AppendLine($"- (`{duration}`): <#{item.ChannelId}> (`{item.ChannelId}`): {own}");
             }
 
-            await FollowupAsync(embed: EmbedHelper.CreateBase(
+            await FollowupAsync(embed: EmbedHelper.CreateBaseWithTitle(
                 title: "Записи",
                 description: sb.ToString()
             ).Build());

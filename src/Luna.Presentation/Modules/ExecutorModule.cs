@@ -133,7 +133,7 @@ public class ExecutorModule
                 sb.AppendLine($"- {role} {id} ({executor.Name})");
             }
 
-            await FollowupAsync(embed: EmbedHelper.CreateBase(
+            await FollowupAsync(embed: EmbedHelper.CreateBaseWithTitle(
                 title: "Исполнители", 
                 description: sb.ToString()
             ).Build());

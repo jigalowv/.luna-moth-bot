@@ -64,12 +64,16 @@ public sealed class RecordRepository : IRecordRepository
         ulong channelId, CancellationToken ct) =>
         await _context.Records.FirstOrDefaultAsync(i => 
             i.ChannelId == channelId, ct);
-
-    public async Task<Record?> GetByCreatorIdAsync(
-        int executorId, CancellationToken ct) =>
-        await _context.Records.FirstOrDefaultAsync(
-            tc => tc.ExecutorId == executorId, ct
-        );
+        
+    public async Task<Record?> GetLastByExecutorIdAsync(
+        int executorId, CancellationToken ct)
+    {
+        return await _context.Records
+            .AsNoTracking()
+            .Where(r => r.ExecutorId == executorId)
+            .OrderByDescending(r => r.StartAt)
+            .FirstOrDefaultAsync(ct);
+    }
 
     public async Task<bool> AddAsync(
         Record record, 

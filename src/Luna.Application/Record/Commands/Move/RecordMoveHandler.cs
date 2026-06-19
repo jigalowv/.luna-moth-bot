@@ -36,7 +36,7 @@ public class RecordMoveHandler : IRequestHandler<RecordMoveRequest, ErrorOr<bool
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Роль исполнителя должна быть " + 
-                    $"`{ExecutorRole.Curator}` или выше.");
+                    $"`куратор` или выше.");
         
         var oldChannel = await _recordRepository
             .GetAsync(request.OldChannelId, ct);
@@ -52,7 +52,7 @@ public class RecordMoveHandler : IRequestHandler<RecordMoveRequest, ErrorOr<bool
             return Error.Forbidden(
                 "User.NoPermission", 
                 "У вас недостаточно прав. Если роль исполнителя " + 
-                $"`{ExecutorRole.Curator}`, то он может использовать " + 
+                $"`куратор`, то он может использовать " + 
                 "эту команду только на свои записи.");
 
         var newChannelId = await _recordRepository
@@ -80,7 +80,8 @@ public class RecordMoveHandler : IRequestHandler<RecordMoveRequest, ErrorOr<bool
             recordAttendances: recordAttendances, 
             oldChannelId: request.OldChannelId, 
             newChannelId: request.NewChannelId, 
-            ct);
+            ct
+        );
 
         if (!success)
             return Error.Failure(

@@ -7,13 +7,21 @@ public static class EmbedHelper
     private const string FooterImageUrl = "https://raw.githubusercontent.com/jigalowv/.luna-moth-bot/main/bot_footer_img.jpg";
     private const string FooterText = "mryak";
 
-    public static EmbedBuilder CreateBase(string title, string description, Color? color = null)
+    public static EmbedBuilder CreateBaseWithTitle(string title, string description, Color? color = null)
+    {
+        if (color is null)
+            color = Color.Blue;
+
+        return CreateBase(description, color)
+            .WithTitle(title);
+    }
+
+    public static EmbedBuilder CreateBase(string description, Color? color = null)
     {
         if (color is null)
             color = Color.Blue;
 
         return new EmbedBuilder()
-            .WithTitle(title)
             .WithDescription(description)
             .WithCurrentTimestamp()
             .WithColor(color.Value)
@@ -33,13 +41,7 @@ public static class EmbedHelper
         string? eventUrl
     )
     {
-        var embed = new EmbedBuilder()
-            .WithDescription(description)
-            .WithCurrentTimestamp()
-            .WithColor(Color.Magenta)
-            .WithFooter(new EmbedFooterBuilder()
-            .WithIconUrl(FooterImageUrl)
-            .WithText(FooterText));
+        var embed = CreateBase(description, Color.Magenta);
         
         string leadersStr = string.Empty;
         foreach (var leader in leaders)
@@ -62,7 +64,7 @@ public static class EmbedHelper
 
     public static EmbedBuilder CreateError(string error)
     {
-        return CreateBase(
+        return CreateBaseWithTitle(
             title: "Ошибка", 
             description: error,
             color: Color.Red);
@@ -70,7 +72,7 @@ public static class EmbedHelper
 
     public static EmbedBuilder CreateUpdate(string description)
     {
-        return CreateBase(
+        return CreateBaseWithTitle(
             title: "Обновлено",
             description: description,
             color: Color.Green

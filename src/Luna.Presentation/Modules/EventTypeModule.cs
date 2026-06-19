@@ -94,7 +94,7 @@ public sealed class EventTypeModule
                 sb.AppendLine($"- {title}");
             }
 
-            var eb = EmbedHelper.CreateBase(
+            var eb = EmbedHelper.CreateBaseWithTitle(
                 title: "Виды событий:",
                 description: sb.ToString()
             );

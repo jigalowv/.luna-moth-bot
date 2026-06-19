@@ -43,7 +43,7 @@ public sealed class RecordUsersHandler
             
         var record = request.ChannelId is null ?
             await _recordRepository
-                .GetByCreatorIdAsync(executor.UserId, ct) : 
+                .GetLastByExecutorIdAsync(executor.UserId, ct) : 
             await _recordRepository
                 .GetAsync(request.ChannelId.Value, ct);
 

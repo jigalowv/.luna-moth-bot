@@ -27,6 +27,6 @@ public interface IRecordRepository
         CancellationToken ct);
 
     Task<Domain.Entities.Record?> GetAsync(ulong id, CancellationToken ct);
-    Task<Domain.Entities.Record?> GetByCreatorIdAsync(int CreatorId, CancellationToken ct);
+    Task<Domain.Entities.Record?> GetLastByExecutorIdAsync(int executorId, CancellationToken ct);
     Task<IReadOnlyCollection<Domain.Entities.Record>> GetAllAsync(CancellationToken ct);
 }
