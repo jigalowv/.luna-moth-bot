@@ -1,7 +1,7 @@
 using Discord;
 using Discord.Interactions;
+using Discord.WebSocket;
 using Luna.Application.Auth.ExecutorHasAccess;
-using Luna.Domain.Entities;
 using Luna.Domain.Enums;
 using Luna.Presentation.Extensions;
 using MediatR;
@@ -72,8 +72,17 @@ public sealed class PostModule : InteractionModuleBase<SocketInteractionContext>
     }
 
     [SlashCommand("embed", "Открыть окно для создания embed сообщения.")]
-    public async Task OpenModalEmbedAsync()
+    public async Task OpenModalEmbedAsync(
+        [Summary("целевой-канал")] 
+        SocketChannel? channel = null)
     {
+        if (channel is not null && channel is not ISocketMessageChannel)
+        {
+            await RespondAsync(embed: EmbedHelper.CreateError(
+                $"В этот канал нельзя написать.").Build(),
+                ephemeral: true);
+        }
+
         try
         {
             var request = new AuthExecutorHasAccessRequest(
@@ -91,7 +100,12 @@ public sealed class PostModule : InteractionModuleBase<SocketInteractionContext>
                 return;
             }
 
-            await RespondWithModalAsync<PostEmbedModal>($"post_embed_submit");
+            string channelId = channel?.Id is null ? 
+                "null" : 
+                channel.Id.ToString();
+
+            await RespondWithModalAsync<PostEmbedModal>(
+                $"post_embed_submit:{channelId}");
         }
         catch (Exception ex)
         {
@@ -104,18 +118,42 @@ public sealed class PostModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    [ModalInteraction("post_embed_submit", ignoreGroupNames: true)]
-    public async Task OnOpenPostForumModal(PostEmbedModal modal)
+    [ModalInteraction("post_embed_submit:*", ignoreGroupNames: true)]
+    public async Task OnOpenPostForumModal(string channelId, PostEmbedModal modal)
     {
         await DeferAsync(ephemeral: true);
+
+        ISocketMessageChannel? channel =
+            ulong.TryParse(channelId, out var id)
+                ? Context.Guild.GetChannel(id) as ISocketMessageChannel
+                : Context.Channel;
+
+        if (channel is null)
+        {
+            await FollowupAsync("Канал не найден или не является текстовым.");
+            return;
+        }
 
         var eb = EmbedHelper.CreateBase(modal.Description, Color.Magenta)
             .WithImageUrl(modal.ImageUrl);
         
-        await Context.Channel.SendMessageAsync(embed: eb.Build());
+        if (modal.Mentions?.Any() == true)
+        {
+            string mentions = string.Join(
+                ", ",
+                modal.Mentions.Select(i => i.Mention));
+
+            await channel
+                .SendMessageAsync(text: mentions, embed: eb.Build());
+        }
+        else
+        {
+            await channel.SendMessageAsync(embed: eb.Build());
+        }
 
         await FollowupAsync(embed: EmbedHelper
-            .CreateBaseWithTitle("Успех", "Вы запостили кринж!").Build());
+            .CreateBaseWithTitle("Успех", "Вы запостили кринж!")
+            .Build());
     }
 
     [SlashCommand("editembed", "Открыть окно для изменения embed сообщения.")]
@@ -180,7 +218,7 @@ public sealed class PostModule : InteractionModuleBase<SocketInteractionContext>
 
             var firstEmbed = message.Embeds.FirstOrDefault();
 
-            var modal = new PostEmbedModal()
+            var modal = new PostEditEmbedModal()
             {
                 Description = firstEmbed?.Description ?? message.Content,
                 ImageUrl = firstEmbed?.Image?.Url ?? ""
@@ -202,7 +240,7 @@ public sealed class PostModule : InteractionModuleBase<SocketInteractionContext>
     }
 
     [ModalInteraction("post_embed_edit_submit:*", ignoreGroupNames: true)]
-    public async Task OnOpenModalPostEmbedEditAsync(string args, PostEmbedModal modal)
+    public async Task OnOpenModalPostEmbedEditAsync(string args, PostEditEmbedModal modal)
     {
         try
         {
@@ -268,12 +306,11 @@ public sealed class PostModule : InteractionModuleBase<SocketInteractionContext>
         {
             _logger.LogError(ex, "Ошибка при подтверждении модального окна для сообщения");
             
-            // На всякий случай уведомляем пользователя, если что-то упало
             try 
             {
                 await FollowupAsync(embed: EmbedHelper.CreateError($"Ошибка: {ex.Message}").Build(), ephemeral: true);
             } 
-            catch { /* игнорируем, если даже фоллоуап не ушел */ }
+            catch { }
         }
     }
 
@@ -327,11 +364,22 @@ public sealed class PostModule : InteractionModuleBase<SocketInteractionContext>
 
     [SlashCommand("event", "Открыть окно для ввода анонса")]
     public async Task OpenModalEventAsync(
+        [Summary("целевой-канал")] 
+        SocketChannel? channel = null,
         [Summary("ссылка-на-правила")]
         string? rulesUrl = null,
         [Summary("ссылка-на-событие-дискорд")]
         string? eventUrl = null)
     {
+        if (channel is not null && channel is not ISocketMessageChannel)
+        {
+            await RespondAsync(embed: EmbedHelper.CreateError(
+                $"В этот канал нельзя написать.").Build(),
+                ephemeral: true);
+            
+            return;
+        }
+
         try
         {
             var request = new AuthExecutorHasAccessRequest(
@@ -351,15 +399,16 @@ public sealed class PostModule : InteractionModuleBase<SocketInteractionContext>
 
             string cacheKey = Guid.NewGuid().ToString("N");
 
-            var data = new PostData
+            var data = new PostEventData
             {
                 RulesUrl = rulesUrl,
-                EventUrl = eventUrl
+                EventUrl = eventUrl,
+                Channel = channel 
             };
 
             _cache.Set(cacheKey, data, TimeSpan.FromMinutes(30));
 
-            await RespondWithModalAsync<PostModal>($"post_event_submit_1:{cacheKey}");
+            await RespondWithModalAsync<PostEventModal>($"post_event_submit_1:{cacheKey}");
         }
         catch (Exception ex)
         {
@@ -373,11 +422,11 @@ public sealed class PostModule : InteractionModuleBase<SocketInteractionContext>
     }
 
     [ModalInteraction("post_event_submit_1:*", ignoreGroupNames: true)]
-    public async Task OnOpenPostEventModal(string cacheKey, PostModal modal)
+    public async Task OnOpenPostEventModal(string cacheKey, PostEventModal modal)
     {   
         await DeferAsync(ephemeral: true);
 
-        if (!_cache.TryGetValue(cacheKey, out PostData? postData) ||
+        if (!_cache.TryGetValue(cacheKey, out PostEventData? postData) ||
             postData is null)
         {
             await FollowupAsync(embed: EmbedHelper
@@ -405,22 +454,22 @@ public sealed class PostModule : InteractionModuleBase<SocketInteractionContext>
     [ComponentInteraction("post_event_continue_btn:*", ignoreGroupNames: true)]
     public async Task OnContinueBtnClick(string cacheKey)
     {
-        if (!_cache.TryGetValue(cacheKey, out PostData? _))
+        if (!_cache.TryGetValue(cacheKey, out PostEventData? _))
         {
             await RespondAsync("Ошибка: сессия потеряна.", ephemeral: true);
             return;
         }
 
         await Context.Interaction
-            .RespondWithModalAsync<PostModal2>($"post_event_submit_2:{cacheKey}");
+            .RespondWithModalAsync<PostEventModal2>($"post_event_submit_2:{cacheKey}");
     }
 
     [ModalInteraction("post_event_submit_2:*", ignoreGroupNames: true)]
-    public async Task OnOpenPostEvent2Modal(string cacheKey, PostModal2 modal)
+    public async Task OnOpenPostEvent2Modal(string cacheKey, PostEventModal2 modal)
     {
         await DeferAsync(ephemeral: true);
 
-        if (!_cache.TryGetValue(cacheKey, out PostData? postData) ||
+        if (!_cache.TryGetValue(cacheKey, out PostEventData? postData) ||
             postData is null)
         {
             await FollowupAsync(embed: EmbedHelper
@@ -446,8 +495,15 @@ public sealed class PostModule : InteractionModuleBase<SocketInteractionContext>
         foreach (var mention in modal.Mentions)
             text += mention.Mention;
 
-        await Context.Channel.SendMessageAsync(
-            text: text, embed: eb.Build());
+        if (postData.Channel is null)
+            await Context.Channel.SendMessageAsync(
+                text: text, embed: eb.Build());
+        else
+        {
+            var channel = postData.Channel as ITextChannel;
+            await channel!.SendMessageAsync(
+                text: text, embed: eb.Build());
+        }
     
         await ModifyOriginalResponseAsync(properties => 
         {

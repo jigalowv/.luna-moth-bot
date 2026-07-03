@@ -3,7 +3,7 @@ using Discord.Interactions;
 
 namespace Luna.Presentation.Modules;
 
-public class PostModal : IModal
+public class PostEventModal : IModal
 {
     public string Title => "Создание поста";
 
@@ -24,7 +24,7 @@ public class PostModal : IModal
     public IChannel[] Place { get; set; } = [];
 }
 
-public class PostModal2 : IModal
+public class PostEventModal2 : IModal
 {
     public string Title => "Продолжение...";
 
@@ -33,6 +33,7 @@ public class PostModal2 : IModal
     public IUser[] Leaders { get; set; } = [];
 
     [InputLabel("Упомянуть")]
+    [RequiredInput(false)]
     [ModalRoleSelect("post_roles", maxValues: 5)]
     public IRole[] Mentions { get; set; } = [];
 
