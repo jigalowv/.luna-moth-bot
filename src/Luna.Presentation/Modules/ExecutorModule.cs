@@ -3,7 +3,7 @@ using Discord.Interactions;
 using Discord.WebSocket;
 using Luna.Application.Executors.Commands.Add;
 using Luna.Application.Executors.Commands.List;
-using Luna.Application.Executors.Commands.SetRole;
+using Luna.Application.Executors.Commands.EditRole;
 using Luna.Domain.Enums;
 using Luna.Presentation.Enums;
 using Luna.Presentation.Extensions;
@@ -29,7 +29,7 @@ public class ExecutorModule
     [SlashCommand("add", "Добавить нового исполнителя.")]
     public async Task AddAsync(
         SocketUser user, 
-        SetExecutorRole role, 
+        EditExecutorRole role, 
         string? name = null, 
         string? imageUrl = null)
     {
@@ -69,8 +69,8 @@ public class ExecutorModule
         }
     }
 
-    [SlashCommand("setrole", "Установить новую роль.")]
-    public async Task SetRoleAsync(SocketUser user, SetExecutorRole newRole)
+    [SlashCommand("edit-role", "Установить новую роль.")]
+    public async Task EditRoleAsync(SocketUser user, EditExecutorRole newRole)
     {
         await DeferAsync(ephemeral: false);
 
@@ -78,7 +78,7 @@ public class ExecutorModule
 
         try
         {
-            var request = new ExecutorSetRoleRequest(
+            var request = new ExecutorEditRoleRequest(
                 ExecutorDiscordId: Context.User.Id, 
                 DiscordId: user.Id, 
                 NewRole: (ExecutorRole)newRole);

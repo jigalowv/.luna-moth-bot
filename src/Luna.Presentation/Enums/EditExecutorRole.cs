@@ -3,7 +3,7 @@ using Luna.Domain.Enums;
 
 namespace Luna.Presentation.Enums;
 
-public enum SetExecutorRole
+public enum EditExecutorRole
 {
     [ChoiceDisplay("куратор")]
     Curator = ExecutorRole.Curator,
