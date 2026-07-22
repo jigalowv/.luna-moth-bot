@@ -11,11 +11,7 @@ using MediatR;
 namespace Luna.Presentation.Services;
 
 public sealed class InteractionHandler
-{
-    private const ulong TrackedGuildId1 = 1343538276799221801;
-    private const ulong TrackedGuildId2 = 1317038113796657223;
-    private const ulong TrackedGuildId3 = 300276721075355649;
-    
+{   
     private readonly ILogger<InteractionHandler> _logger;
     private readonly InteractionService _interactionService;
     private readonly IServiceProvider _services;

@@ -151,7 +151,7 @@ namespace Luna.Infrastructure.Data
                 entity.HasKey(e => e.Id);
 
                 entity.HasOne(e => e.Creator)
-                    .WithMany()
+                    .WithMany(e => e.Events)
                     .HasForeignKey(e => e.CreatorId)
                     .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired();
