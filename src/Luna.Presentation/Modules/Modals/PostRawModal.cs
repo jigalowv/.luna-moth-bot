@@ -7,10 +7,10 @@ public sealed class PostRawModal : IModal
 {
     public string Title => "Создание поста";
 
-    [InputLabel("Целевой канал")]
-    [ModalChannelSelect("post_raw_channel")]
+    [InputLabel("Упоминания сверху")]
+    [ModalRoleSelect("post_embed_mentions", maxValues: 25)]
     [RequiredInput(false)]
-    public IChannel? Channel { get; set; }
+    public IRole[] Mentionables { get; set; } = [];
 
     [InputLabel("Содержание поста")]
     [ModalTextInput("post_raw_content", style: TextInputStyle.Paragraph)]

@@ -32,7 +32,8 @@ public sealed class RecordModule
     }
 
     [SlashCommand("start", "Начать запись.")]
-    public async Task StartAsync(SocketVoiceChannel channel)
+    public async Task StartAsync(
+        [ChannelTypes(ChannelType.Voice, ChannelType.Stage)] SocketChannel channel)
     {
         await DeferAsync(ephemeral: false);
 
@@ -47,11 +48,13 @@ public sealed class RecordModule
             return;
         }
 
+        SocketVoiceChannel voiceChannel = (SocketVoiceChannel)channel;
+
         try
         {
             Dictionary<ulong, bool> idAndIsDeafenPairs = [];
 
-            foreach (var user in channel.ConnectedUsers.Where(i => !i.IsBot))
+            foreach (var user in voiceChannel.ConnectedUsers.Where(i => !i.IsBot))
             {
                 idAndIsDeafenPairs[user.Id] = user.IsDeafened;
             }
@@ -84,7 +87,8 @@ public sealed class RecordModule
     }
 
     [SlashCommand("cancel", "Отменить запись.")]
-    public async Task CancelAsync(SocketVoiceChannel channel)
+    public async Task CancelAsync(
+        [ChannelTypes(ChannelType.Voice, ChannelType.Stage)] SocketChannel channel)
     {
         await DeferAsync(ephemeral: false);
 
@@ -99,11 +103,13 @@ public sealed class RecordModule
             return;
         }
 
+        SocketVoiceChannel voiceChannel = (SocketVoiceChannel)channel;
+
         try
         {
             var request = new RecordCancelRequest(
                 ExecutorDiscordId: Context.User.Id,
-                ChannelId: channel.Id);
+                ChannelId: voiceChannel.Id);
 
             var response = await _mediator.Send(request, cts.Token);
 
@@ -139,7 +145,7 @@ public sealed class RecordModule
                 $"""
                 Запись **отменена**.
 
-                ### Участники ({channel.Mention}):
+                ### Участники (<#{voiceChannel.Id}>):
                 {sb}
                 """
             ).Build());
@@ -157,7 +163,8 @@ public sealed class RecordModule
     }
 
     [SlashCommand("users", "Вывести список записанных пользователей.")]
-    public async Task UsersAsync(SocketVoiceChannel? channel = null)
+    public async Task UsersAsync(
+        [ChannelTypes(ChannelType.Voice, ChannelType.Stage)] SocketChannel? channel = null)
     {
         await DeferAsync(ephemeral: false);
 
@@ -173,11 +180,13 @@ public sealed class RecordModule
             return;
         }
 
+        SocketVoiceChannel? voiceChannel = channel as SocketVoiceChannel;
+
         try
         {
             var request = new RecordUsersRequest(
                 ExecutorDiscordId: Context.User.Id,
-                ChannelId: channel?.Id);
+                ChannelId: voiceChannel?.Id);
 
             var response = await _mediator.Send(request, cts.Token);
             
@@ -283,7 +292,7 @@ public sealed class RecordModule
     [SlashCommand("move", "Назначить другой канал для записи.")]
     public async Task MoveAsync(
         [Summary("old-channel-id")] string oldChannelIdStr, 
-        SocketVoiceChannel newChannel)
+        [ChannelTypes(ChannelType.Voice, ChannelType.Stage)] SocketChannel? newChannel = null)
     {
         await DeferAsync(ephemeral: false);
 
@@ -307,13 +316,15 @@ public sealed class RecordModule
             return;
         }
 
+        SocketVoiceChannel voiceChannel = (SocketVoiceChannel)newChannel;
+
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
         try
         {
             Dictionary<ulong, bool> idAndIsDeafenPairs = [];
 
-            foreach (var user in newChannel.ConnectedUsers.Where(i => !i.IsBot))
+            foreach (var user in voiceChannel.ConnectedUsers.Where(i => !i.IsBot))
             {
                 idAndIsDeafenPairs[user.Id] = user.IsDeafened;
             }
@@ -322,7 +333,7 @@ public sealed class RecordModule
                 ExecutorDiscordId: Context.User.Id,
                 IdAndIsDeafenPairs: idAndIsDeafenPairs,
                 OldChannelId: oldChannelId,
-                NewChannelId: newChannel.Id
+                NewChannelId: voiceChannel.Id
             );
             
             var response = await _mediator.Send(request, cts.Token);
@@ -330,7 +341,7 @@ public sealed class RecordModule
             await response.Match(
                 success => FollowupAsync(embed: EmbedHelper
                     .CreateUpdate("Запись была перемещена:" + 
-                        $" <#{oldChannelIdStr}> → {newChannel.Mention}")
+                        $" <#{oldChannelIdStr}> → {voiceChannel.Mention}")
                     .Build()),
                 errors => FollowupAsync(embed: EmbedHelper
                     .CreateError(errors.First().Description).Build())
@@ -350,7 +361,7 @@ public sealed class RecordModule
 
     [SlashCommand("end", "Закончить запись с дальнейшим созданием события в репозитории.")]
     public async Task EndAsync(
-        SocketVoiceChannel channel,
+        [ChannelTypes(ChannelType.Voice, ChannelType.Stage)] SocketChannel channel,
         [Summary("event-type", "Тип события (выберите из списка)")] 
         [Autocomplete(typeof(EventTypeAutocomplete))] string eventTypeTitle,
 
@@ -370,11 +381,13 @@ public sealed class RecordModule
             return;
         }
 
+        SocketVoiceChannel voiceChannel = (SocketVoiceChannel)channel;
+
         try
         {
             var request = new RecordEndRequest(
                 ExecutorDiscordId: Context.User.Id,
-                ChannelId: channel.Id,
+                ChannelId: voiceChannel.Id,
                 EventTypeTitle: eventTypeTitle,
                 Role: (MemberRole)(role ?? AllowedEndRoles.Player),
                 MinDuration: minDuration

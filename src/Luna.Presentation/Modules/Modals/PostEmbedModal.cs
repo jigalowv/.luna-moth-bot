@@ -5,10 +5,15 @@ namespace Luna.Presentation.Modules.Modals;
 
 public class PostEmbedModal : IModal
 {
-    [InputLabel("Целевой канал")]
-    [ModalChannelSelect("post_embed_channel")]
+    [InputLabel("@everyone и/или @here")]
+    [ModalTextInput("post_embed_header", style: TextInputStyle.Short)]
     [RequiredInput(false)]
-    public IChannel? Channel { get; set; }
+    public string? Header { get; set; }
+
+    [InputLabel("Упоминания")]
+    [ModalRoleSelect("post_embed_mentions", maxValues: 25)]
+    [RequiredInput(false)]
+    public IRole[] Mentionables { get; set; } = [];
 
     [InputLabel("Содержание поста")]
     [ModalTextInput("post_embed_content", style: TextInputStyle.Paragraph)]

@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Discord;
 using Discord.Interactions;
+using Discord.WebSocket;
 using Luna.Application.Auth.ExecutorHasAccess;
 using Luna.Domain.Enums;
 using Luna.Presentation.Extensions;
@@ -470,7 +471,8 @@ public class EditModule : InteractionModuleBase<SocketInteractionContext>
     [SlashCommand("event-place", "Обновляет место проведения в embed.")]
     public async Task SetEventPlaceAsync(
         string messageUrl, 
-        IChannel channel)
+        [ChannelTypes(ChannelType.Text, ChannelType.Voice, ChannelType.Stage)] 
+        SocketChannel channel)
     {
         await DeferAsync(ephemeral: true);
 

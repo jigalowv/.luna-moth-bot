@@ -45,7 +45,9 @@ public sealed class PostModule(
     public async Task PostEventAsync(
         [Summary("событие", "Ссылка на событие Discord")] string eventUrl,
         [Summary("время", "Timestamp проведения")] string time,
-        [Summary("канал", "Канал для публикации")] SocketChannel? targetChannel = null)
+        [Summary("канал", "Канал для публикации")] 
+        [ChannelTypes(ChannelType.Text, ChannelType.News)]
+        SocketChannel? targetChannel = null)
     {
         if (!await EnsureCuratorAccessAsync()) return;
 
@@ -79,19 +81,9 @@ public sealed class PostModule(
     public async Task PostRawSubmitAsync(PostRawModal modal)
     {
         await DeferAsync(ephemeral: true);
-
-        if (modal.Channel is null)
-        {
-            modal.Channel = Context.Channel;
-        }
-
-        if (modal.Channel is not ISocketMessageChannel channel)
-        {
-            await FollowupAsync(embed: EmbedHelper.CreateError("Выберите корректный канал для отправки.").Build(), ephemeral: true);
-            return;
-        }
-
-        await channel.SendMessageAsync(modal.Content);
+        string text = string.Join(" ", modal.Mentionables
+            .Select(m => m.Mention)) + "\n" + modal.Content;
+        await Context.Channel.SendMessageAsync(text);
         await FollowupAsync(embed: EmbedHelper.CreateBaseWithTitle("Успех", "Вы запостили кринж!").Build());
     }
 
@@ -100,23 +92,15 @@ public sealed class PostModule(
     {
         await DeferAsync(ephemeral: true);
 
-        if (modal.Channel is null)
-        {
-            modal.Channel = Context.Channel;
-        }
-
-        if (modal.Channel is not ISocketMessageChannel channel)
-        {
-            await FollowupAsync(embed: EmbedHelper.CreateError("Выберите корректный канал для отправки.").Build(), ephemeral: true);
-            return;
-        }
-
         var embed = EmbedHelper
             .CreateBase(modal.Content, Color.Magenta)
             .WithImageUrl(modal.ImageUrl)
             .Build();
 
-        await channel.SendMessageAsync(embed: embed);
+        string headerText = modal.Header + " " ?? string.Empty;
+        string text = headerText + string.Join(" ", modal.Mentionables.Select(m => m.Mention));
+
+        await Context.Channel.SendMessageAsync(text: text, embed: embed);
         await FollowupAsync(embed: EmbedHelper.CreateBaseWithTitle("Успех", "Вы запостили кринж!").Build());
     }
 
@@ -255,7 +239,11 @@ public sealed class PostModule(
 
         postData.LeaderIds = modal.Leaders.Select(i => i.Id).ToList();
         postData.PlaceChannelId = modal.Place.Id;
-        postData.MentionsText = string.Join(" ", modal.Mentionables.Select(m => m.Mention));
+
+        string headerText = modal.Header + " " ?? string.Empty;
+        string text = headerText + string.Join(" ", modal.Mentionables.Select(m => m.Mention));
+
+        postData.MentionsText = text;
 
         var embed = EmbedHelper.CreatePost(
             description: postData.Description,
